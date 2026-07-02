@@ -1,0 +1,40 @@
+{
+    "IntervalConfig": {
+        "windowsize": 0.20,
+        "stepsize": 0.05
+    },
+    "ICPConfig": {
+        "maxiterations": 50,
+        "Voxelization": {
+            "use": true,
+            "voxelsize": 0.06
+        },
+        "Matching": {
+            "maxdist": 0.06
+        },
+        "Normals": {
+            "radius": 0.01,
+            "minpoints": 10
+        },
+        "Rejection": {
+            "normalangle": {
+                "use": true,
+                "maxangle": 40
+            },
+            "roughness": {
+                "use": true,
+                "max_roughness": 0.005
+            },
+            "MAD": {
+                "use": true
+            }
+        }
+    },
+    "GeorefConfig": {
+        "globaloffset": {
+            "x": 356743,
+            "y": 5608006,
+            "z": 0
+        }
+    }
+}

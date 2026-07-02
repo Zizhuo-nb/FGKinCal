@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<SystemCalibration FormatVersion="1">
+	<x>1.254</x>
+	<y>-0.545</y>
+	<z>0.587</z>
+	<rx>-143.769</rx>
+	<ry>-0.369</ry>
+	<rz>89.833</rz>
+</SystemCalibration>
