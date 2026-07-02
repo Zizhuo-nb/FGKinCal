@@ -3,7 +3,6 @@ import numpy as np
 from factor_graph.core.icp_factor import icp_error_func
 from factor_graph.core.smooth_factor import smooth_error_func
 
-
 def T_to_pose3(T):
     R = gtsam.Rot3(T[:3,:3])
     t = T[:3, 3]
@@ -11,8 +10,6 @@ def T_to_pose3(T):
 
 def pose3_to_T(pose):
     return pose.matrix()
-
-
 
 
 def gtsam_optimize_sliding_icp(window_buffer, noise_model):
