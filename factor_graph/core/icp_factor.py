@@ -9,7 +9,7 @@ from factor_graph.tool.tool import rigid_transform
 from factor_graph.tool.tool import icp_error_jacobian
 import random
 
-class icpFactor:
+class icpFactorbefore:
     def __init__(self, pc1, pc2):
         self.pc1 = pc1
         self.pc2 = pc2
