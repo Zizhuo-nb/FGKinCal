@@ -57,6 +57,15 @@ class icpFactor:
             matched_time = matched_time[idx]
 
         # Compute sum of scalar product
+
+        # 保证只有一个法向量时仍然是二维数组 (1, 3)
+        n1 = np.asarray(n1).reshape(-1, 3)
+        n2 = np.asarray(n2).reshape(-1, 3)
+
+        # 所有匹配都被过滤掉
+        if n1.shape[0] == 0 or n2.shape[0] == 0:
+            return None, None
+
         sp = np.sum(n1 * n2, axis=1)
 
         # Filter by angle between normals
