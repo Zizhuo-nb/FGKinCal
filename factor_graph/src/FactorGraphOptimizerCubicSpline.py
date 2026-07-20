@@ -250,9 +250,14 @@ class FactorGraphSpline:
     def optimize_buffer_until_converged(
         self,
         window_buffer,
-        max_iterations=20,
-        tolerance=1e-6
+        max_iterations=1,
+        rotation_tolerance=5e-4,       # rad，约0.029度
+        translation_tolerance=2e-4,    # m，约0.2 mm
+        update_scale=1,
+        stable_iterations=2
     ):
+        stable_count = 0
+
         for iteration in range(max_iterations):
 
             print()
@@ -264,7 +269,7 @@ class FactorGraphSpline:
             optimization_buffer = []
 
             # =====================================================
-            # 1. 用当前完整样条更新点云，并重新匹配
+            # 1. 使用当前完整样条更新点云并重新匹配
             # =====================================================
             for item in window_buffer:
 
@@ -317,14 +322,12 @@ class FactorGraphSpline:
                     "timeL": matched_timeL,
                     "timeL_all": item["timeL_all"],
                     "icp_residual": residual_before,
-
-                    # 连续因子使用当前完整系数
                     "spline_coefficients":
                         item["spline_coefficients"].copy()
                 })
 
             # =====================================================
-            # 2. 当前所有窗口一起进行GTSAM优化
+            # 2. 当前所有窗口联合GTSAM优化
             # =====================================================
             optimization_buffer, result = (
                 gtsam_optimize_sliding_icp_cubic_spline(
@@ -333,11 +336,13 @@ class FactorGraphSpline:
                 )
             )
 
-            # =====================================================
-            # 3. 查看本轮优化结果并累加增量
-            # =====================================================
-            max_change = 0.0
+            # 当前整张滑动窗口中最大的实际位姿变化
+            max_rotation_change = 0.0
+            max_translation_change = 0.0
 
+            # =====================================================
+            # 3. 检查本轮实际位姿变化，并更新样条系数
+            # =====================================================
             for item, optimized_item in zip(
                 window_buffer,
                 optimization_buffer
@@ -346,19 +351,66 @@ class FactorGraphSpline:
                     "delta_coeff_opt"
                 ]
 
-                coefficient_change = np.linalg.norm(
-                    delta_coeff
+                delta_matrix = delta_coeff.reshape(4, 6)
+
+                # 当前样条段长度
+                time_end = float(
+                    np.max(item["timeL_all"])
                 )
 
-                max_change = max(
-                    max_change,
-                    coefficient_change
+                # 在起点、中点和终点检查实际6D变化
+                check_times = (
+                    0.0,
+                    0.5 * time_end,
+                    time_end
                 )
 
-                # 在本轮固定匹配点上应用GTSAM求出的增量
+                window_rotation_change = 0.0
+                window_translation_change = 0.0
+
+                for t in check_times:
+                    delta_xi = (
+                        delta_matrix[0]
+                        + t * delta_matrix[1]
+                        + t**2 * delta_matrix[2]
+                        + t**3 * delta_matrix[3]
+                    )
+
+                    rotation_change = np.linalg.norm(
+                        delta_xi[0:3]
+                    )
+
+                    translation_change = np.linalg.norm(
+                        delta_xi[3:6]
+                    )
+
+                    window_rotation_change = max(
+                        window_rotation_change,
+                        rotation_change
+                    )
+
+                    window_translation_change = max(
+                        window_translation_change,
+                        translation_change
+                    )
+
+                max_rotation_change = max(
+                    max_rotation_change,
+                    window_rotation_change
+                )
+
+                max_translation_change = max(
+                    max_translation_change,
+                    window_translation_change
+                )
+
+                # 阻尼更新，减少外层ICP来回振荡
+                applied_delta = update_scale * delta_coeff
+
+                # 在本轮固定匹配上检查阻尼更新后的RMSE
                 p2_after = transform_points_with_cubic_spline(
                     optimized_item["p2"],
-                    delta_coeff,
+                    applied_delta,
                     optimized_item["timeL"]
                 )
 
@@ -382,13 +434,15 @@ class FactorGraphSpline:
                     f"window {item['window'] + 1}: "
                     f"RMSE {rmse_before:.8f} -> "
                     f"{rmse_after:.8f}, "
-                    f"delta norm = {coefficient_change:.8e}"
+                    f"max rotation = "
+                    f"{np.degrees(window_rotation_change):.6f} deg, "
+                    f"max translation = "
+                    f"{window_translation_change * 1000:.6f} mm"
                 )
 
-                # 累加到当前完整样条系数
-                item["spline_coefficients"] += delta_coeff
+                # 累加阻尼后的增量
+                item["spline_coefficients"] += applied_delta
 
-                # 保存检测结果
                 item["p1"] = optimized_item["p1"]
                 item["p2"] = optimized_item["p2"]
                 item["n"] = optimized_item["n"]
@@ -399,17 +453,41 @@ class FactorGraphSpline:
 
                 item["icp_rmse_before"] = rmse_before
                 item["icp_rmse_after"] = rmse_after
-                item["delta_coeff_norm"] = coefficient_change
+                item["delta_rotation_max"] = (
+                    window_rotation_change
+                )
+                item["delta_translation_max"] = (
+                    window_translation_change
+                )
 
             print(
-                f"maximum coefficient change: "
-                f"{max_change:.8e}"
+                "maximum pose change: "
+                f"rotation = "
+                f"{np.degrees(max_rotation_change):.6f} deg, "
+                f"translation = "
+                f"{max_translation_change * 1000:.6f} mm"
             )
 
             # =====================================================
-            # 4. 判断整个滑动窗口是否收敛
+            # 4. 根据实际位姿变化判断收敛
             # =====================================================
-            if max_change < tolerance:
+            is_stable = (
+                max_rotation_change < rotation_tolerance
+                and
+                max_translation_change < translation_tolerance
+            )
+
+            if is_stable:
+                stable_count += 1
+
+                print(
+                    f"stable iteration: "
+                    f"{stable_count} / {stable_iterations}"
+                )
+            else:
+                stable_count = 0
+
+            if stable_count >= stable_iterations:
                 print(
                     f"outer ICP converged after "
                     f"{iteration + 1} iterations"
@@ -570,3 +648,5 @@ class FactorGraphSpline:
             path_out=kin_cal.output_dir,
             fname="r"
         )
+
+        
