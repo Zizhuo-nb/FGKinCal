@@ -1,31 +1,37 @@
 import gtsam
 import numpy as np
 from factor_graph.core.icp_factor import icp_error_func
+from factor_graph.core.cubic_spline_factor import (icp_error_func_cubic_spline,
+                                                   c0_between_error_func,
+                                                   c1_between_error_func,
+                                                   c2_between_error_func)
 from factor_graph.core.smooth_factor import smooth_error_func
+from factor_graph.tool.tool import (transform_points_with_cubic_spline,
+                                    icp_error_cubic_spline_jacobian,
+                                    c0_between_factor_cubic_spline_jacobian,
+                                    c1_between_factor_cubic_spline_jacobian,
+                                    c2_between_factor_cubic_spline_jacobian)
 
-def T_to_pose3(T):
-    R = gtsam.Rot3(T[:3,:3])
-    t = T[:3, 3]
-    return gtsam.Pose3(R, gtsam.Point3(t[0], t[1], t[2]))
-
-def pose3_to_T(pose):
-    return pose.matrix()
-
-
-def gtsam_optimize_sliding_icp(window_buffer, noise_model):
+def gtsam_optimize_sliding_icp_cubic_spline(
+    window_buffer,
+    noise_model
+):
     graph = gtsam.NonlinearFactorGraph()
     initial_values = gtsam.Values()
 
-    smooth_noise = gtsam.noiseModel.Diagonal.Sigmas(
-        noise_model["smooth_sigmas"]
-    )
-
+    # =========================================================
+    # 1. 为每个窗口建立24维增量节点和ICP单因子
+    # =========================================================
     for item in window_buffer:
         key = gtsam.symbol("x", item["window"])
 
+        # 当前p2已经应用了完整样条修正
+        # 本轮GTSAM只估计新增量
+        delta_coeff_init = np.zeros(24)
+
         initial_values.insert(
             key,
-            T_to_pose3(item["delta_T_init"])
+            delta_coeff_init
         )
 
         icp_noise = gtsam.noiseModel.Isotropic.Sigma(
@@ -37,31 +43,84 @@ def gtsam_optimize_sliding_icp(window_buffer, noise_model):
             gtsam.CustomFactor(
                 icp_noise,
                 [key],
-                icp_error_func(item["p1"], item["p2"], item["n"])
+                icp_error_func_cubic_spline(
+                    item["p1"],
+                    item["p2"],
+                    item["n"],
+                    item["timeL"]
+                )
             )
         )
-    #========================================================================
-    #turn this on if you want to add smooth factors between consecutive windows
 
-    # for k in range(1, len(window_buffer)):
-    #     item_prev = window_buffer[k - 1]
-    #     item_curr = window_buffer[k]
+    # =========================================================
+    # 2. 为相邻窗口加入C0、C1、C2连续因子
+    # =========================================================
+    continuity_noise = gtsam.noiseModel.Diagonal.Sigmas(
+        noise_model["smooth_sigmas"]
+    )
 
-    #     key_prev = gtsam.symbol("x", item_prev["window"])
-    #     key_curr = gtsam.symbol("x", item_curr["window"])
+    for k in range(1, len(window_buffer)):
+        item_left = window_buffer[k - 1]
+        item_right = window_buffer[k]
 
-    #     graph.add(
-    #         gtsam.CustomFactor(
-    #             smooth_noise,
-    #             [key_prev, key_curr],
-    #             smooth_error_func(
-    #                 item_prev["Delta_T_base"],
-    #                 item_curr["Delta_T_base"]
-    #             )
-    #         )
-    #     )
-    #========================================================================
+        key_left = gtsam.symbol(
+            "x",
+            item_left["window"]
+        )
 
+        key_right = gtsam.symbol(
+            "x",
+            item_right["window"]
+        )
+
+        # 左侧样条段的结束局部时间
+        # 注意使用完整窗口的timeL_all，而不是匹配后的timeL
+        timeL_end = float(
+            np.max(item_left["timeL_all"])
+        )
+
+        # C0连续
+        graph.add(
+            gtsam.CustomFactor(
+                continuity_noise,
+                [key_left, key_right],
+                c0_between_error_func(
+                    item_left["spline_coefficients"],
+                    item_right["spline_coefficients"],
+                    timeL_end
+                )
+            )
+        )
+
+        # C1连续
+        graph.add(
+            gtsam.CustomFactor(
+                continuity_noise,
+                [key_left, key_right],
+                c1_between_error_func(
+                    item_left["spline_coefficients"],
+                    item_right["spline_coefficients"],
+                    timeL_end
+                )
+            )
+        )
+
+        # C2连续
+        graph.add(
+            gtsam.CustomFactor(
+                continuity_noise,
+                [key_left, key_right],
+                c2_between_error_func(
+                    item_left["spline_coefficients"],
+                    item_right["spline_coefficients"],
+                    timeL_end
+                )
+            )
+        )
+
+    # =========================================================
+    # 3. 联合优化
+    # =========================================================
     optimizer = gtsam.LevenbergMarquardtOptimizer(
         graph,
         initial_values
@@ -69,13 +128,16 @@ def gtsam_optimize_sliding_icp(window_buffer, noise_model):
 
     result = optimizer.optimize()
 
+    # =========================================================
+    # 4. 读取每个窗口的24维新增量
+    # =========================================================
     for item in window_buffer:
         key = gtsam.symbol("x", item["window"])
-        delta_T_opt = pose3_to_T(result.atPose3(key))
 
-        item["delta_T_opt"] = delta_T_opt
-        item["delta_T_init"] = delta_T_opt
+        delta_coeff_opt = result.atVector(key)
 
-        item["Delta_T"] = delta_T_opt @ item["Delta_T_base"]
+        item["delta_coeff_opt"] = (
+            delta_coeff_opt.copy()
+        )
 
     return window_buffer, result
