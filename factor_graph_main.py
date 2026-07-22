@@ -3,8 +3,7 @@ from src.directgeoreferencing.directgeoreferencing import directgeoreferencing
 from src.base.base import RotmatX, RotmatY, RotmatZ, Rotmat2Euler, Euler2RotMat
 from src.icp.SymPlane2PlaneICP import SymPlane2PlaneICP
 from colorama import init, Fore, Style
-# from factor_graph.src.FactorGraphOptimizer import FactorGraph
-from factor_graph.src.FactorGraphOptimizerCubicSpline import FactorGraphSpline
+from factor_graph.src.FactorGraphOptimizer import FactorGraph
 from colorama import init, Fore, Style
 import click
 import shutil
@@ -27,7 +26,7 @@ def main(parent_dir,
          date):
     
 
-    factorgraph = FactorGraphSpline(parent_dir,
+    factorgraph = FactorGraph(parent_dir,
                               output_dir,
                               calibration_dir,
                               configfile,
