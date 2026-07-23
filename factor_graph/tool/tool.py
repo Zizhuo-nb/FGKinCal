@@ -103,3 +103,19 @@ def adjoint_SE3(T):
     Ad[3:6, 3:6] = R
 
     return Ad
+
+
+    #========================================FOR SPLINE OPTIMIZATION========================================#
+
+    def icp_spline_jacobian():
+        pass
+
+    def c0_spline_jacobian():
+        pass
+
+    def c1_spline_jacobian():
+        pass    
+
+    def c2_spline_jacobian():
+        pass
+    

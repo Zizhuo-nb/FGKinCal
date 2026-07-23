@@ -1,15 +1,7 @@
-from src.core.KinematicCalibration import KinematicCalibration
-from src.directgeoreferencing.directgeoreferencing import directgeoreferencing
-from src.base.base import RotmatX, RotmatY, RotmatZ, Rotmat2Euler, Euler2RotMat
-from src.icp.SymPlane2PlaneICP import SymPlane2PlaneICP
-from colorama import init, Fore, Style
+from factor_graph.src.FactorGraphOptimizerCubicSpline import FactorGraphOptimizerCubicSpline
 from factor_graph.src.FactorGraphOptimizer import FactorGraph
-from colorama import init, Fore, Style
 import click
-import shutil
-import os
-import glob
-import numpy as np
+
 @click.command()
 @click.option("--parent_dir", "-pa", default="/mnt/syn180/241111_FieldPheno4D_multi_crop_multi_modal/01_cropplotdata/New_structure", type=str, help="Path to the dataset directory")
 @click.option("--output_dir", "-pb", default="output/", type=str, help="Path to the output data directory")
@@ -26,7 +18,7 @@ def main(parent_dir,
          date):
     
 
-    factorgraph = FactorGraph(parent_dir,
+    factorgraph = FactorGraphOptimizerCubicSpline(parent_dir,
                               output_dir,
                               calibration_dir,
                               configfile,

@@ -1,13 +1,13 @@
 {
     "IntervalConfig": {
-        "windowsize": 0.20,
-        "stepsize": 0.1
+        "windowsize": 0.5,
+        "stepsize": 0.5
     },
     "ICPConfig": {
         "maxiterations": 50,
         "convergence_threshold": 0.001,
         "Voxelization": {
-            "use": true,
+            "use": false,
             "voxelsize": 0.06
         },
         "Matching": {
@@ -20,15 +20,15 @@
         },
         "Rejection": {
             "normalangle": {
-                "use": true,
+                "use": false,
                 "maxangle": 40
             },
             "roughness": {
-                "use": true,
+                "use": false,
                 "max_roughness": 0.005
             },
             "MAD": {
-                "use": true
+                "use": false
             }
         }
     },
