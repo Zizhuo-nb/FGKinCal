@@ -166,7 +166,7 @@ class CubicIcpFactor:
             else:
                 discarded_indices.append(idx)
         kept_indices = [i for i in range(len(x)) if i not in discarded_indices]
-        return np.array(n), np.array(std), kept_indices
+        return np.array(n).reshape(-1,3), np.array(std), kept_indices
     
     @staticmethod
     def plane_fitting(points):

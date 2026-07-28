@@ -1,26 +1,45 @@
+import os
+
+import CSF
+import numpy as np
+from scipy.spatial.transform import Rotation
+
+from factor_graph.core.cubic_factor import CubicIcpFactor
+from factor_graph.core.gtsam_cubic_spline_optimizer import (
+    gtsam_optimize_single_cubic_icp,
+)
+from src.base.base import RotmatX, RotmatY, RotmatZ
+from src.config.sICPconfig import sICPconfig
 from src.core.KinematicCalibration import KinematicCalibration
 from src.directgeoreferencing.directgeoreferencing import directgeoreferencing
-from factor_graph.core.cubic_factor import CubicIcpFactor
-from src.config.sICPconfig import sICPconfig
-from factor_graph.core.gtsam_cubic_spline_optimizer import gtsam_optimize_single_cubic_icp
-from factor_graph.core.cubic_factor import icp_error_func
-from scipy.spatial.transform import Rotation
-from src.base.base import RotmatX, RotmatY, RotmatZ, Rotmat2Euler
-import CSF
-import os
-import numpy as np
+
+#===========检查采样点分布以及z形状===============
+
+from factor_graph.tool.testing_tool import plot_sampled_points_time_z,plot_full_z_and_max_z_by_timestamp,detect_plant_time_interval
 
 
+#===============================================
 
 
 class FactorGraphOptimizerCubicSpline:
-    def __init__(self,
-                 parent_dir,
-                 output_dir,
-                 calibration_dir,
-                 configfile,
-                 plot_id,
-                 date):
+    """Optimize cubic-spline calibration parameters for one point-cloud window."""
+
+    WINDOW_INDEX = 14
+    OUTPUT_WINDOW_ID = WINDOW_INDEX
+
+    MAX_OUTER_ITERATIONS = 50
+    OUTER_RMSE_THRESHOLD = 1e-5
+    ICP_SIGMA = 0.01
+
+    def __init__(
+        self,
+        parent_dir,
+        output_dir,
+        calibration_dir,
+        configfile,
+        plot_id,
+        date,
+    ):
         self.parent_dir = parent_dir
         self.output_dir = output_dir
         self.calibration_dir = calibration_dir
@@ -28,222 +47,466 @@ class FactorGraphOptimizerCubicSpline:
         self.plot_id = plot_id
         self.date = date
         self.config = sICPconfig()
-       
-
 
     def run(self):
-        kin_cal = KinematicCalibration(self.parent_dir,
-                                       self.output_dir,
-                                       self.calibration_dir,
-                                       self.configfile)
-        
-        kin_cal.copy_data(self.plot_id , self.date)
+        """Run ground separation, iterative matching, and spline optimization."""
+        kin_cal = KinematicCalibration(
+            self.parent_dir,
+            self.output_dir,
+            self.calibration_dir,
+            self.configfile,
+        )
+
+        kin_cal.copy_data(self.plot_id, self.date)
         kin_cal.print_info()
         kin_cal.loadconfig()
         kin_cal.loadcalibration()
         kin_cal.loaddata()
 
-        idxL, idxR = kin_cal.get_alignment_intervals()#same as before, generating windows for "ICP"
+        idx_left, idx_right = kin_cal.get_alignment_intervals()
 
-        for i in range(len(idxR)):
-            pass    
-#===============================================one window=========================================
-        pc_l, pc_r,time_r,R_NB_r, t_NB_r = self.window_data(2,kin_cal,idxL,idxR)
-        print(pc_l.shape)
-        print(pc_r.shape)
-        print(time_r.shape)
-        print(R_NB_r.shape)
-        print(t_NB_r.shape)
+        (
+            pc_left,
+            pc_right,
+            time_right,
+            rotation_right,
+            translation_right,
+        ) = self.window_data(
+            self.WINDOW_INDEX,
+            kin_cal,
+            idx_left,
+            idx_right,
+        )
 
-        # cubic_icp = CubicIcpFactor(pc_l, pc_r)
-        # matching,pcr_idx = cubic_icp.matching(self.config)
-        # print(matching.shape, "====" , pcr_idx.shape)
+        print(f"pc_left:          {pc_left.shape}")
+        print(f"pc_right:         {pc_right.shape}")
+        print(f"time_right:       {time_right.shape}")
+        print(f"rotation_right:   {rotation_right.shape}")
+        print(f"translation_right:{translation_right.shape}")
 
-        time_r = np.asarray(time_r).reshape(-1)
-        window_start = np.min(time_r)
-        window_duration = np.max(time_r) - window_start
+        time_right = np.asarray(time_right).reshape(-1)
+        window_start = np.min(time_right)
+        window_duration = np.max(time_right) - window_start
 
-        if window_duration <0:
-             raise ValueError("window duration is not positive")
+        if window_duration <= 0:
+            raise ValueError("Window duration must be positive.")
 
+        coefficients = np.zeros(24, dtype=np.float64)
+        #=============================CSF================================
+        # Separate non-ground and ground points using CSF.
+        left_non_ground_idx, left_ground_idx = get_non_ground_indices(
+            pc_left,
+            name="left",
+        )
+        right_non_ground_idx, right_ground_idx = get_non_ground_indices(
+            pc_right,
+            name="right",
+        )
 
+        pc_left_non_ground = pc_left[left_non_ground_idx]
+        pc_left_ground = pc_left[left_ground_idx]
+        #================================================================
+        # # ============================= CSF: ground only =============================
 
+        # _, left_ground_idx = get_non_ground_indices(
+        #     pc_left,
+        #     name="left",
+        # )
 
-        coefficients = np.zeros(24)
+        # _, right_ground_idx = get_non_ground_indices(
+        #     pc_right,
+        #     name="right",
+        # )
 
+        # # Only the left ground cloud is fixed.
+        # pc_left_ground = pc_left[left_ground_idx]
 
-             
-        # 只生成用于ICP的非地面索引
-        left_keep_idx = get_non_ground_indices(pc_l, "left")
-        right_keep_idx = get_non_ground_indices(pc_r, "right")
-        #CLOTH
+        # print(
+        #     f"Ground-only optimization: "
+        #     f"left_ground={len(left_ground_idx)}, "
+        #     f"right_ground={len(right_ground_idx)}"
+        # )
 
-        pc_l_icp = pc_l[left_keep_idx]
+        # # ============================================================================
 
-        #CLOTH
-        
+        # # ============================= CSF: plant only =============================
+
+        # left_non_ground_idx, _ = get_non_ground_indices(
+        #     pc_left,
+        #     name="left",
+        # )
+
+        # right_non_ground_idx, _ = get_non_ground_indices(
+        #     pc_right,
+        #     name="right",
+        # )
+
+        # # Only the left plant / non-ground cloud is fixed.
+        # pc_left_non_ground = pc_left[left_non_ground_idx]
+
+        # print(
+        #     f"Plant-only optimization: "
+        #     f"left_non_ground={len(left_non_ground_idx)}, "
+        #     f"right_non_ground={len(right_non_ground_idx)}"
+        # )
+
+        # # ===========================================================================
+
         previous_rmse = None
-        rmse_threshold = 1e-5
-        max_outer_iterations = 50
 
-        for outer_iteration in range(max_outer_iterations):
+        for outer_iteration in range(self.MAX_OUTER_ITERATIONS):
+            # Apply the current spline correction to the complete right cloud.
+            pc_right_corrected = correct_full_right_cloud(
+                pc_r=pc_right,
+                time_r=time_right,
+                R_NB_r=rotation_right,
+                t_NB_r=translation_right,
+                coefficients=coefficients,
+                window_start=window_start,
+                window_duration=window_duration,
+            )
+            #=====================CSF=======================
+            # Keep ground and non-ground matching independent.
+            pc_right_non_ground = pc_right_corrected[right_non_ground_idx]
+            pc_right_ground = pc_right_corrected[right_ground_idx]
 
-            # 1. 当前样条修正完整右点云
-            pc_r_corrected = correct_full_right_cloud(
-                pc_r,
-                time_r,
-                R_NB_r,
-                t_NB_r,
-                coefficients,
-                window_start,
-                window_duration
+            non_ground_icp = CubicIcpFactor(
+                pc_left_non_ground,
+                pc_right_non_ground,
+            )
+            ground_icp = CubicIcpFactor(
+                pc_left_ground,
+                pc_right_ground,
             )
 
-            # 2. 使用修正后的点云重新匹配
-            # cubic_icp = CubicIcpFactor(
-            #     pc_l,
-            #     pc_r_corrected
+            matching_non_ground, filtered_non_ground_idx = non_ground_icp.matching(
+                self.config
+            )
+            matching_ground, filtered_ground_idx = ground_icp.matching(
+                self.config
+            )
+
+            # Convert filtered local indices back to original right-cloud indices.
+            right_match_idx = right_non_ground_idx[filtered_non_ground_idx]
+
+            # The optimizer requires the original static right points.
+            matching_non_ground_opt = matching_non_ground.copy()
+            matching_non_ground_opt[:, 3:6] = pc_right[right_match_idx]
+            
+
+            if len(matching_ground) > 0:
+                right_ground_match_idx = right_ground_idx[filtered_ground_idx]
+
+                matching_ground_opt = matching_ground.copy()
+                matching_ground_opt[:, 3:6] = pc_right[right_ground_match_idx]
+
+                matching_all = np.concatenate(
+                    [matching_non_ground_opt, matching_ground_opt],
+                    axis=0,
+                )
+                right_match_idx_all = np.concatenate(
+                    [right_match_idx, right_ground_match_idx]
+                )
+            else:
+                matching_all = matching_non_ground_opt
+                right_match_idx_all = right_match_idx
+            #=====================CSF=======================
+
+            # # ============================= Ground-only matching =========================
+
+            # # Extract the corrected right ground cloud.
+            # pc_right_ground = pc_right_corrected[right_ground_idx]
+
+            # ground_icp = CubicIcpFactor(
+            #     pc_left_ground,
+            #     pc_right_ground,
             # )
-            #TIHUAN上面的#
-            pc_r_corrected_icp = pc_r_corrected[right_keep_idx]
 
-            cubic_icp = CubicIcpFactor(
-                pc_l_icp,
-                pc_r_corrected_icp
-            )
-
-            #替换上面的
-
-            # matching, pcr_idx = cubic_icp.matching(
+            # matching_ground, filtered_ground_idx = ground_icp.matching(
             #     self.config
             # )
 
-            ##替换上面的
-            matching, pcr_idx_filtered = cubic_icp.matching(self.config)
+            # if len(matching_ground) == 0:
+            #     raise RuntimeError(
+            #         f"No ground matches found at outer iteration "
+            #         f"{outer_iteration + 1}."
+            #     )
 
-            pcr_idx = right_keep_idx[pcr_idx_filtered]
+            # # matching() returns indices relative to pc_right_ground.
+            # # Convert them back to indices of the original complete right cloud.
+            # right_ground_match_idx = right_ground_idx[
+            #     filtered_ground_idx
+            # ]
 
-            #替换上面的
+            # # The optimizer needs the original, uncorrected right points.
+            # matching_all = matching_ground.copy()
+            # matching_all[:, 3:6] = pc_right[
+            #     right_ground_match_idx
+            # ]
 
-            # 3. 残差函数需要原始静态右点
-            matching_for_opt = matching.copy()
-            matching_for_opt[:, 3:6] = pc_r[pcr_idx]
+            # # Keep this variable name because the optimizer and visualization use it.
+            # right_match_idx_all = right_ground_match_idx
 
-            # 4. 重新优化
+            # # ============================================================================
+
+            # # ========================== Plant-only matching ============================
+
+            # # Extract the corrected right non-ground cloud.
+            # pc_right_non_ground = pc_right_corrected[right_non_ground_idx]
+
+            # non_ground_icp = CubicIcpFactor(
+            #     pc_left_non_ground,
+            #     pc_right_non_ground,
+            # )
+
+            # matching_non_ground, filtered_non_ground_idx = non_ground_icp.matching(
+            #     self.config
+            # )
+
+            # if len(matching_non_ground) == 0:
+            #     raise RuntimeError(
+            #         f"No non-ground matches found at outer iteration "
+            #         f"{outer_iteration + 1}."
+            #     )
+
+            # # Convert local non-ground indices back to the original full right cloud.
+            # right_non_ground_match_idx = right_non_ground_idx[
+            #     filtered_non_ground_idx
+            # ]
+
+            # # The optimizer needs the original static right points.
+            # matching_all = matching_non_ground.copy()
+            # matching_all[:, 3:6] = pc_right[
+            #     right_non_ground_match_idx
+            # ]
+
+            # # Keep the same variable name for optimizer / visualization.
+            # right_match_idx_all = right_non_ground_match_idx
+
+            # # ===========================================================================
+
+            # #==================================No CSF==========================
+            # # Match the complete left and right point clouds without CSF.
+            # full_cloud_icp = CubicIcpFactor(
+            #     pc_left,
+            #     pc_right_corrected,
+            # )
+
+            # matching_all, right_match_idx_all = full_cloud_icp.matching(
+            #     self.config
+            # )
+
+            # # Restore the original static right points for optimization.
+            # matching_all = matching_all.copy()
+            # matching_all[:, 3:6] = pc_right[right_match_idx_all]
+            # #==================================No CSF==========================
+            
+
             coefficients, rmse = gtsam_optimize_single_cubic_icp(
-                matching=matching_for_opt,
-                pcr_idx=pcr_idx,
-                time_r=time_r,
-                R_NB_r=R_NB_r,
-                t_NB_r=t_NB_r,
+                matching=matching_all,
+                pcr_idx=right_match_idx_all,
+                time_r=time_right,
+                R_NB_r=rotation_right,
+                t_NB_r=translation_right,
                 window_start=window_start,
                 window_duration=window_duration,
                 coefficients_init=coefficients,
-                icp_sigma=0.01
+                icp_sigma=self.ICP_SIGMA,
             )
-
+            #print info for csf
             print(
-                f"outer iteration {outer_iteration + 1}: "
-                f"matches={matching.shape[0]}, RMSE={rmse:.8f}"
+                f"Outer iteration {outer_iteration + 1}: "
+                f"non_ground_matches={len(matching_non_ground)}, "
+                f"ground_matches={len(matching_ground)}, "
+                f"total_matches={len(matching_all)}, "
+                f"RMSE={rmse:.8f}"
             )
+            #print info for no csf
+            # print(
+            #     f"Outer iteration {outer_iteration + 1}: "
+            #     f"full_cloud_matches={len(matching_all)}, "
+            #     f"RMSE={rmse:.8f}"
+            # )
 
-            # 5. RMSE变化足够小则停止
             if previous_rmse is not None:
                 rmse_change = abs(previous_rmse - rmse)
 
-                if rmse_change < rmse_threshold:
+                if rmse_change < self.OUTER_RMSE_THRESHOLD:
                     print("Outer loop converged.")
                     break
 
             previous_rmse = rmse
-
-        save_single_window_pointclouds(
-            output_dir=kin_cal.output_dir,
-            window_id=1,
-            pc_l=pc_l,
-            pc_r=pc_r,
-            time_r=time_r,
-            R_NB_r=R_NB_r,
-            t_NB_r=t_NB_r,
-            coefficients_opt=coefficients,
+        #=================打印检查z轴以及采样点分布=======================
+        # Recompute the point cloud using the final spline coefficients.
+        final_pc_right_corrected = correct_full_right_cloud(
+            pc_r=pc_right,
+            time_r=time_right,
+            R_NB_r=rotation_right,
+            t_NB_r=translation_right,
+            coefficients=coefficients,
             window_start=window_start,
-            window_duration=window_duration
+            window_duration=window_duration,
+        )
+        # plot_full_z_and_max_z_by_timestamp(
+        #     window_start=window_start,
+        #     window_end=window_start + window_duration,
+        #     point_cloud=final_pc_right_corrected,
+        #     point_times=time_right,
+        #     window_id=self.OUTPUT_WINDOW_ID,
+        #     save_path=os.path.join(
+        #         kin_cal.output_dir,
+        #         f"window_{self.OUTPUT_WINDOW_ID}_full_z_max_profile.png",
+        #     ),
+        #     show=True,
+        #     show_all_points=True,
+        #     time_bin_size=None,
+        # )
+
+        # Final matched right points used by the optimizer.
+        final_sampled_points = final_pc_right_corrected[
+            right_match_idx_all
+        ]
+
+        final_sampled_times = time_right[
+            right_match_idx_all
+        ]
+
+        plot_sampled_points_time_z(
+            window_start=window_start,
+            window_end=window_start + window_duration,
+            sampled_points=final_sampled_points,
+            sampled_times=final_sampled_times,
+            window_id=self.OUTPUT_WINDOW_ID,
+            save_path=os.path.join(
+                kin_cal.output_dir,
+                f"window_{self.OUTPUT_WINDOW_ID}_sampling_time_z.png",
+            ),
+            show=True,
         )
 
-#==================================================================================================
 
 
+        plant_interval = detect_plant_time_interval(
+            point_cloud=pc_right,
+            point_times=time_right,
+            window_start=window_start,
+        )
+        if plant_interval is not None:
+            plant_start_time = plant_interval[
+                "plant_start_time"
+            ]
 
+            plant_end_time = plant_interval[
+                "plant_end_time"
+            ]
+        #===============================================================
+        save_single_window_pointclouds(
+            output_dir=kin_cal.output_dir,
+            window_id=self.OUTPUT_WINDOW_ID,
+            pc_l=pc_left,
+            pc_r=pc_right,
+            time_r=time_right,
+            R_NB_r=rotation_right,
+            t_NB_r=translation_right,
+            coefficients_opt=coefficients,
+            window_start=window_start,
+            window_duration=window_duration,
+        )
 
-    def window_data(self,i,kin_cal,idxL,idxR):
-            idxleft= np.arange(idxL[i][0],idxL[i][1])
-            idxright= np.arange(idxR[i][0], idxR[i][1])
-    
-            TLi= kin_cal.TL.crop_by_index(idxleft) #trajectory data
-            LMIl_i = kin_cal.lmidataL.crop_by_index(idxleft) #laser data
-            TRi= kin_cal.TR.crop_by_index(idxright)
-            LMIr_i = kin_cal.lmidataR.crop_by_index(idxright)
-    
-            # Run point cloud creation
-            georefL = directgeoreferencing( TLi, LMIl_i, kin_cal.calL )
-            pcl_i = georefL.run( calibration="static" ) 
-    
-            georefR = directgeoreferencing( TRi, LMIr_i, kin_cal.calR )
-            pcr_i = georefR.run( calibration="static" )
-    
+    def window_data(self, window_index, kin_cal, idx_left, idx_right):
+        """Create left/right point clouds and per-point right trajectory data."""
+        left_indices = np.arange(
+            idx_left[window_index][0],
+            idx_left[window_index][1],
+        )
+        right_indices = np.arange(
+            idx_right[window_index][0],
+            idx_right[window_index][1],
+        )
 
-    
-            pc_l = pcl_i.xyz 
-            pc_r = pcr_i.xyz #tuple(N,3)
-            time_r_list = [] #(N,1)
-            R_NB_r_list = [] #(N,3,3)
-            t_NB_r_list = [] #(N,3)
+        trajectory_left = kin_cal.TL.crop_by_index(left_indices)
+        laser_left = kin_cal.lmidataL.crop_by_index(left_indices)
 
-            for idx, frame in enumerate(LMIr_i.frames):
-                num_points = frame.M
+        trajectory_right = kin_cal.TR.crop_by_index(right_indices)
+        laser_right = kin_cal.lmidataR.crop_by_index(right_indices)
 
-                state = TRi.statesall[idx]
+        # Generate statically calibrated point clouds.
+        georef_left = directgeoreferencing(
+            trajectory_left,
+            laser_left,
+            kin_cal.calL,
+        )
+        point_cloud_left = georef_left.run(calibration="static")
 
-                R_NB = (
-                    RotmatZ(state[9])
-                    @ RotmatY(state[8])
-                    @ RotmatX(state[7])
+        georef_right = directgeoreferencing(
+            trajectory_right,
+            laser_right,
+            kin_cal.calR,
+        )
+        point_cloud_right = georef_right.run(calibration="static")
+
+        pc_left = point_cloud_left.xyz
+        pc_right = point_cloud_right.xyz
+
+        time_right_list = []
+        rotation_right_list = []
+        translation_right_list = []
+
+        # Expand each trajectory state to all laser points in its frame.
+        for frame_index, frame in enumerate(laser_right.frames):
+            num_points = frame.M
+            state = trajectory_right.statesall[frame_index]
+
+            rotation_nb = (
+                RotmatZ(state[9])
+                @ RotmatY(state[8])
+                @ RotmatX(state[7])
+            )
+            translation_nb = state[1:4]
+
+            time_right_list.append(
+                np.full(
+                    (num_points, 1),
+                    laser_right.timestamps[frame_index],
                 )
-
-                t_NB = state[1:4]
-
-                time_r_list.append(
-                    np.full((num_points, 1), LMIr_i.timestamps[idx])
+            )
+            rotation_right_list.append(
+                np.repeat(
+                    rotation_nb[None, :, :],
+                    num_points,
+                    axis=0,
                 )
-
-                R_NB_r_list.append(
-                    np.repeat(R_NB[None, :, :], num_points, axis=0)
+            )
+            translation_right_list.append(
+                np.repeat(
+                    translation_nb[None, :],
+                    num_points,
+                    axis=0,
                 )
+            )
 
-                t_NB_r_list.append(
-                    np.repeat(t_NB[None, :], num_points, axis=0)
-                )
+        time_right = np.vstack(time_right_list)
+        rotation_right = np.concatenate(rotation_right_list, axis=0)
+        translation_right = np.vstack(translation_right_list)
 
-            time_r = np.vstack(time_r_list)
-            R_NB_r = np.concatenate(R_NB_r_list, axis=0)
-            t_NB_r = np.vstack(t_NB_r_list)
-
-            
-            return pc_l, pc_r,time_r, R_NB_r,t_NB_r
-
-
-
-
+        return (
+            pc_left,
+            pc_right,
+            time_right,
+            rotation_right,
+            translation_right,
+        )
 
 
 def get_non_ground_indices(points, name="cloud"):
+    """Return CSF non-ground indices and downsampled ground indices."""
     points = np.asarray(points, dtype=np.float64)
 
     csf = CSF.CSF()
-    csf.params.bSloopSmooth = False
-    csf.params.cloth_resolution = 0.1
-    csf.params.class_threshold = 0.03
-
+    csf.params.bSloopSmooth = True
+    csf.params.cloth_resolution = 0.01
+    csf.params.class_threshold = 0.05
+    csf.params.rigidness = 1
     csf.setPointCloud(points)
 
     ground = CSF.VecInt()
@@ -253,125 +516,135 @@ def get_non_ground_indices(points, name="cloud"):
     ground_idx = np.asarray(ground, dtype=np.int64)
     non_ground_idx = np.asarray(non_ground, dtype=np.int64)
 
-    print(
-        f"[CSF] {name}: total={len(points)}, "
-        f"ground={len(ground_idx)}, "
-        f"non-ground={len(non_ground_idx)}, "
-        f"kept={100 * len(non_ground_idx) / len(points):.2f}%"
+    raw_ground_count = len(ground_idx)
+    ground_idx = voxel_downsample_indices(
+        points,
+        ground_idx,
+        voxel_size=0.007,
     )
 
-    return non_ground_idx
+    print(
+        f"[CSF] {name}: "
+        f"total={len(points)}, "
+        f"ground_raw={raw_ground_count}, "
+        f"ground_downsampled={len(ground_idx)}, "
+        f"non_ground={len(non_ground_idx)}, "
+        f"non_ground_ratio={100 * len(non_ground_idx) / len(points):.2f}%"
+    )
+
+    return non_ground_idx, ground_idx
 
 
+def voxel_downsample_indices(points, indices, voxel_size=0.05):
+    """Downsample selected points while preserving original point indices."""
+    selected_points = points[indices]
+    voxel_coordinates = np.floor(
+        selected_points / voxel_size
+    ).astype(np.int64)
 
+    _, unique_local_indices = np.unique(
+        voxel_coordinates,
+        axis=0,
+        return_index=True,
+    )
+
+    return indices[unique_local_indices]
 
 
 def correct_full_right_cloud(
-        pc_r,
-        time_r,
-        R_NB_r,
-        t_NB_r,
-        coefficients,
-        window_start,
-        window_duration
+    pc_r,
+    time_r,
+    R_NB_r,
+    t_NB_r,
+    coefficients,
+    window_start,
+    window_duration,
 ):
+    """Apply the time-dependent cubic-spline correction to the right cloud."""
     time_r = np.asarray(time_r).reshape(-1)
+    normalized_time = (time_r - window_start) / window_duration
 
-    u = (time_r - window_start) / window_duration
-
-    basis = np.column_stack((
-        np.ones_like(u),
-        u,
-        u**2,
-        u**3
-    ))
+    basis = np.column_stack(
+        (
+            np.ones_like(normalized_time),
+            normalized_time,
+            normalized_time**2,
+            normalized_time**3,
+        )
+    )
 
     coefficients = np.asarray(coefficients).reshape(6, 4)
-    xi = basis @ coefficients.T
+    correction_twist = basis @ coefficients.T
 
-    delta_R = Rotation.from_rotvec(
-        xi[:, 0:3]
+    delta_rotation = Rotation.from_rotvec(
+        correction_twist[:, 0:3]
     ).as_matrix()
+    delta_translation = correction_twist[:, 3:6]
 
-    translation = xi[:, 3:6]
-
-    q_static_body = np.einsum(
+    # Transform global points into the instantaneous body frame.
+    static_body_points = np.einsum(
         "nij,nj->ni",
         R_NB_r.transpose(0, 2, 1),
-        pc_r - t_NB_r
+        pc_r - t_NB_r,
     )
 
-    q_corrected_body = (
+    # Apply the spline correction in the body frame.
+    corrected_body_points = (
         np.einsum(
             "nij,nj->ni",
-            delta_R,
-            q_static_body
+            delta_rotation,
+            static_body_points,
         )
-        + translation
+        + delta_translation
     )
 
-    pc_r_corrected = (
+    # Transform corrected body-frame points back to the global frame.
+    return (
         np.einsum(
             "nij,nj->ni",
             R_NB_r,
-            q_corrected_body
+            corrected_body_points,
         )
         + t_NB_r
     )
 
-    return pc_r_corrected
-
-
-
-
-
-
-
-
-
-
 
 def save_single_window_pointclouds(
-        output_dir,
-        window_id,
-        pc_l,
-        pc_r,
-        time_r,
-        R_NB_r,
-        t_NB_r,
-        coefficients_opt,
-        window_start,
-        window_duration
+    output_dir,
+    window_id,
+    pc_l,
+    pc_r,
+    time_r,
+    R_NB_r,
+    t_NB_r,
+    coefficients_opt,
+    window_start,
+    window_duration,
 ):
+    """Save left, original-right, and corrected-right point clouds."""
     os.makedirs(output_dir, exist_ok=True)
 
-    # 使用样条系数修正完整右点云
-    pc_r_corrected = correct_full_right_cloud(
+    pc_right_corrected = correct_full_right_cloud(
         pc_r=pc_r,
         time_r=time_r,
         R_NB_r=R_NB_r,
         t_NB_r=t_NB_r,
         coefficients=coefficients_opt,
         window_start=window_start,
-        window_duration=window_duration
+        window_duration=window_duration,
     )
 
-    np.savetxt(
-        os.path.join(output_dir, f"window_{window_id}_left_utm.xyz"),
-        pc_l,
-        fmt="%.6f"
-    )
+    output_files = {
+        f"window_{window_id}_left_utm.xyz": pc_l,
+        f"window_{window_id}_right_original_utm.xyz": pc_r,
+        f"window_{window_id}_right_corrected_utm.xyz": pc_right_corrected,
+    }
 
-    np.savetxt(
-        os.path.join(output_dir, f"window_{window_id}_right_original_utm.xyz"),
-        pc_r,
-        fmt="%.6f"
-    )
-
-    np.savetxt(
-        os.path.join(output_dir, f"window_{window_id}_right_corrected_utm.xyz"),
-        pc_r_corrected,
-        fmt="%.6f"
-    )
+    for filename, point_cloud in output_files.items():
+        np.savetxt(
+            os.path.join(output_dir, filename),
+            point_cloud,
+            fmt="%.6f",
+        )
 
     print("Point clouds saved to:", output_dir)

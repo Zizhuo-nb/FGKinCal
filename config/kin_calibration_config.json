@@ -16,7 +16,7 @@
         "Normals": {
             "radius": 0.01,
             "minpoints": 10,
-            "maxpoints": 1000
+            "maxpoints": 1000000000000000000000000000000000
         },
         "Rejection": {
             "normalangle": {
