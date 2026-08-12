@@ -315,6 +315,188 @@ return:
 
     return residual, jacobian
 
+
+
+def c0_error_func():
+    """Create C0 continuity factor between two adjacent spline windows."""
+
+    basis_left = np.array(
+        [1.0, 1.0, 1.0, 1.0],
+        dtype=float,
+    )
+
+    basis_right = np.array(
+        [1.0, 0.0, 0.0, 0.0],
+        dtype=float,
+    )
+
+    jacobian_left = np.kron(
+        np.eye(6),
+        basis_left.reshape(1, 4),
+    )
+
+    jacobian_right = -np.kron(
+        np.eye(6),
+        basis_right.reshape(1, 4),
+    )
+
+    def error_func(this, values, H):
+        key_left = this.keys()[0]
+        key_right = this.keys()[1]
+
+        coefficients_left = values.atVector(
+            key_left
+        ).reshape(6, 4)
+
+        coefficients_right = values.atVector(
+            key_right
+        ).reshape(6, 4)
+
+        value_left = coefficients_left @ basis_left
+        value_right = coefficients_right @ basis_right
+
+        residual = value_left - value_right
+
+        if H is not None:
+            H[0] = jacobian_left
+            H[1] = jacobian_right
+
+        return residual
+
+    return error_func
+
+
+
+def c1_error_func(
+    duration_left,
+    duration_right,
+):
+    """Create C1 continuity factor between two adjacent spline windows."""
+
+    basis_left = (
+        np.array(
+            [0.0, 1.0, 2.0, 3.0],
+            dtype=float,
+        )
+        / duration_left
+    )
+
+    basis_right = (
+        np.array(
+            [0.0, 1.0, 0.0, 0.0],
+            dtype=float,
+        )
+        / duration_right
+    )
+
+    jacobian_left = np.kron(
+        np.eye(6),
+        basis_left.reshape(1, 4),
+    )
+
+    jacobian_right = -np.kron(
+        np.eye(6),
+        basis_right.reshape(1, 4),
+    )
+
+    def error_func(this, values, H):
+        key_left = this.keys()[0]
+        key_right = this.keys()[1]
+
+        coefficients_left = values.atVector(
+            key_left
+        ).reshape(6, 4)
+
+        coefficients_right = values.atVector(
+            key_right
+        ).reshape(6, 4)
+
+        derivative_left = (
+            coefficients_left @ basis_left
+        )
+
+        derivative_right = (
+            coefficients_right @ basis_right
+        )
+
+        residual = (
+            derivative_left - derivative_right
+        )
+
+        if H is not None:
+            H[0] = jacobian_left
+            H[1] = jacobian_right
+
+        return residual
+
+    return error_func
+
+
+def c2_error_func(
+    duration_left,
+    duration_right,
+):
+    """Create C2 continuity factor between two adjacent spline windows."""
+
+    basis_left = (
+        np.array(
+            [0.0, 0.0, 2.0, 6.0],
+            dtype=float,
+        )
+        / duration_left**2
+    )
+
+    basis_right = (
+        np.array(
+            [0.0, 0.0, 2.0, 0.0],
+            dtype=float,
+        )
+        / duration_right**2
+    )
+
+    jacobian_left = np.kron(
+        np.eye(6),
+        basis_left.reshape(1, 4),
+    )
+
+    jacobian_right = -np.kron(
+        np.eye(6),
+        basis_right.reshape(1, 4),
+    )
+
+    def error_func(this, values, H):
+        key_left = this.keys()[0]
+        key_right = this.keys()[1]
+
+        coefficients_left = values.atVector(
+            key_left
+        ).reshape(6, 4)
+
+        coefficients_right = values.atVector(
+            key_right
+        ).reshape(6, 4)
+
+        second_derivative_left = (
+            coefficients_left @ basis_left
+        )
+
+        second_derivative_right = (
+            coefficients_right @ basis_right
+        )
+
+        residual = (
+            second_derivative_left
+            - second_derivative_right
+        )
+
+        if H is not None:
+            H[0] = jacobian_left
+            H[1] = jacobian_right
+
+        return residual
+
+    return error_func
+
     
 
     

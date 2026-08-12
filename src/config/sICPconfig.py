@@ -32,7 +32,7 @@ class sICPconfig:
         self.max_iterations = 50
         self.convergence_threshold = 0.001
         self.voxelization_use = True
-        self.voxel_size = 0.01
+        self.voxel_size = 0.015
         self.max_dist = 0.06
         self.normals_radius = 0.01
         self.normals_minpoints = 10

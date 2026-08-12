@@ -132,7 +132,193 @@ def plot_sampled_points_time_z(
 
 
 
+import os
+import numpy as np
+import matplotlib.pyplot as plt
 
+
+def plot_sampled_points_time_z_stitched(
+    window_records,
+    save_path=None,
+    show=True,
+):
+    """
+    Plot sampled ground points and plant/non-ground points from all windows
+    in one stitched figure.
+
+    Parameters
+    ----------
+    window_records : list of dict
+        Each dict must contain:
+            - "window_id"
+            - "window_start"
+            - "window_end"
+            - "ground_points"
+            - "ground_times"
+            - "plant_points"
+            - "plant_times"
+
+    save_path : str or None
+        Optional path for saving the figure.
+
+    show : bool
+        Whether to display the figure.
+    """
+    if len(window_records) == 0:
+        print("[Sampling plot] No window records to plot.")
+        return
+
+    # Sort windows by window_id to ensure correct stitching order
+    window_records = sorted(
+        window_records,
+        key=lambda record: record["window_id"]
+    )
+
+    figure, axis = plt.subplots(figsize=(16, 7))
+
+    cumulative_time_offset = 0.0
+    plotted_ground_label = False
+    plotted_plant_label = False
+
+    for record in window_records:
+        window_id = record["window_id"]
+        window_start = float(record["window_start"])
+        window_end = float(record["window_end"])
+        window_duration = window_end - window_start
+
+        if window_duration <= 0:
+            print(
+                f"[Sampling plot] Skip window {window_id}: "
+                f"invalid duration."
+            )
+            continue
+
+        ground_points = np.asarray(
+            record["ground_points"],
+            dtype=np.float64,
+        )
+        ground_times = np.asarray(
+            record["ground_times"],
+            dtype=np.float64,
+        ).reshape(-1)
+
+        plant_points = np.asarray(
+            record["plant_points"],
+            dtype=np.float64,
+        )
+        plant_times = np.asarray(
+            record["plant_times"],
+            dtype=np.float64,
+        ).reshape(-1)
+
+        # --------------------------------------------------------------
+        # Plot plant / non-ground points
+        # --------------------------------------------------------------
+        if len(plant_points) > 0:
+            stitched_plant_time = (
+                plant_times - window_start + cumulative_time_offset
+            )
+            plant_z = plant_points[:, 2]
+
+            axis.scatter(
+                stitched_plant_time,
+                plant_z,
+                s=8,
+                alpha=0.7,
+                c="tab:green",
+                label=(
+                    "Plant / non-ground"
+                    if not plotted_plant_label
+                    else None
+                ),
+            )
+            plotted_plant_label = True
+
+        # --------------------------------------------------------------
+        # Plot ground points
+        # --------------------------------------------------------------
+        if len(ground_points) > 0:
+            stitched_ground_time = (
+                ground_times - window_start + cumulative_time_offset
+            )
+            ground_z = ground_points[:, 2]
+
+            axis.scatter(
+                stitched_ground_time,
+                ground_z,
+                s=8,
+                alpha=0.6,
+                c="tab:blue",
+                label=(
+                    "Ground"
+                    if not plotted_ground_label
+                    else None
+                ),
+            )
+            plotted_ground_label = True
+
+        # --------------------------------------------------------------
+        # Draw window boundaries
+        # --------------------------------------------------------------
+        axis.axvline(
+            cumulative_time_offset,
+            color="gray",
+            linestyle="--",
+            linewidth=0.8,
+            alpha=0.5,
+        )
+
+        axis.text(
+            cumulative_time_offset + 0.02 * window_duration,
+            axis.get_ylim()[1] if len(axis.lines) > 0 else 0.0,
+            f"W{window_id}",
+            fontsize=9,
+            alpha=0.7,
+        )
+
+        cumulative_time_offset += window_duration
+
+    # Final right boundary
+    axis.axvline(
+        cumulative_time_offset,
+        color="gray",
+        linestyle="--",
+        linewidth=0.8,
+        alpha=0.5,
+    )
+
+    axis.set_xlabel("Stitched relative time across windows [s]")
+    axis.set_ylabel("Global Z coordinate [m]")
+    axis.set_title(
+        "Sampled-point temporal/Z distribution across all windows\n"
+        "(ground and plant/non-ground shown separately)"
+    )
+
+    axis.grid(True, alpha=0.3)
+    axis.legend()
+    figure.tight_layout()
+
+    if save_path is not None:
+        output_parent = os.path.dirname(save_path)
+
+        if output_parent:
+            os.makedirs(
+                output_parent,
+                exist_ok=True,
+            )
+
+        figure.savefig(
+            save_path,
+            dpi=300,
+            bbox_inches="tight",
+        )
+
+        print(f"[Sampling plot] Saved to: {save_path}")
+
+    if show:
+        plt.show()
+
+    plt.close(figure)
 
 
 
