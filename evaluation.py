@@ -59,62 +59,6 @@
 #     analyze_m3c2(r"F:\UNIVERSITY_BONN\master_thesis\working_space\evaluat_file\FOR_P151\M3C2_static_pointCloud.txt")
 
 
-# import open3d as o3d
-
-# pcd1 = o3d.t.io.read_point_cloud(r"F:\UNIVERSITY_BONN\master_thesis\working_space\KinScanCal\output\pcl_kinematic_calibration.las")
-# pcd2 = o3d.t.io.read_point_cloud(r"F:\UNIVERSITY_BONN\master_thesis\working_space\KinScanCal\output\pcr_kinematic_calibration.las")
-
-# params = o3d.t.geometry.MetricParameters()
-
-# result = pcd1.compute_metrics(
-#     pcd2,
-#     [o3d.t.geometry.Metric.ChamferDistance],
-#     params
-# )
-
-# print(result)
-
-
-
-
-# import laspy
-# import numpy as np
-# import open3d as o3d
-
-
-# def read_las_as_o3d(path):
-#     las = laspy.read(path)
-
-#     points = np.column_stack([
-#         las.x,
-#         las.y,
-#         las.z
-#     ]).astype(np.float32)
-
-#     pcd = o3d.t.geometry.PointCloud(
-#         o3d.core.Tensor(points)
-#     )
-
-#     return pcd
-
-
-# pcd1 = read_las_as_o3d(
-#     r"F:\UNIVERSITY_BONN\master_thesis\working_space\KinScanCal\output\pcl_kinematic_calibration.las"
-# )
-
-# pcd2 = read_las_as_o3d(
-#     r"F:\UNIVERSITY_BONN\master_thesis\working_space\KinScanCal\output\pcr_kinematic_calibration.las"
-# )
-
-# params = o3d.t.geometry.MetricParameters()
-
-# result = pcd1.compute_metrics(
-#     pcd2,
-#     [o3d.t.geometry.Metric.ChamferDistance],
-#     params
-# )
-
-# print(result)
 
 
 

@@ -1,5 +1,6 @@
-from factor_graph.src.FactorGraphOptimizerCubicSpline import FactorGraphOptimizerCubicSpline
-from factor_graph.src.FactorGraphOptimizer import FactorGraph
+from factor_graph.src.FactorGraphOptimizerCubicSpline1 import FactorGraphOptimizerCubicSpline
+from factor_graph.src.FactorGraphOptimizationCubicSplineBatch import FactorGraphOptimizerCubicSplineBatch
+
 import click
 
 @click.command()
@@ -18,7 +19,7 @@ def main(parent_dir,
          date):
     
 
-    factorgraph = FactorGraphOptimizerCubicSpline(parent_dir,
+    factorgraph = FactorGraphOptimizerCubicSplineBatch(parent_dir,
                               output_dir,
                               calibration_dir,
                               configfile,

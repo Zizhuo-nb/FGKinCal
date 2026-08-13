@@ -247,45 +247,6 @@ class FactorGraphOptimizerCubicSpline:
                         ground_icp.matching(self.config)
                     )
 
-                    # # Convert non-ground indices from the segmented right
-                    # # cloud back to indices of the complete right cloud.
-                    # right_match_idx = data["right_non_ground_idx"][
-                    #     filtered_non_ground_idx
-                    # ]
-
-                    # # The optimizer must receive the original static right
-                    # # points, not the already corrected matching points.
-                    # matching_non_ground_opt = matching_non_ground.copy()
-                    # matching_non_ground_opt[:, 3:6] = data["pc_right"][
-                    #     right_match_idx
-                    # ]
-
-                    # # Merge plant/non-ground and ground correspondences.
-                    # if len(matching_ground) > 0:
-                    #     right_ground_match_idx = data["right_ground_idx"][
-                    #         filtered_ground_idx
-                    #     ]
-
-                    #     matching_ground_opt = matching_ground.copy()
-                    #     matching_ground_opt[:, 3:6] = data["pc_right"][
-                    #         right_ground_match_idx
-                    #     ]
-
-                    #     matching_all = np.concatenate(
-                    #         [matching_non_ground_opt, matching_ground_opt],
-                    #         axis=0,
-                    #     )
-                    #     right_match_idx_all = np.concatenate(
-                    #         [right_match_idx, right_ground_match_idx]
-                    #     )
-                    # else:
-                    #     matching_all = matching_non_ground_opt
-                    #     right_match_idx_all = right_match_idx
-
-                    # # Store the current correspondences for the joint
-                    # # optimizer. These values are replaced every outer loop.
-                    # data["matching"] = matching_all
-                    # data["pcr_idx"] = right_match_idx_all
 
                     right_match_idx_non_ground = data["right_non_ground_idx"][
                         filtered_non_ground_idx
@@ -394,52 +355,6 @@ class FactorGraphOptimizerCubicSpline:
                 window_duration=window_duration,
             )
 
-            # Optional diagnostic: complete Z profile for the window.
-            # plot_full_z_and_max_z_by_timestamp(
-            #     window_start=window_start,
-            #     window_end=window_start + window_duration,
-            #     point_cloud=final_pc_right_corrected,
-            #     point_times=time_right,
-            #     window_id=window_index,
-            #     save_path=os.path.join(
-            #         kin_cal.output_dir,
-            #         f"window_{window_index}_full_z_max_profile.png",
-            #     ),
-            #     show=True,
-            #     show_all_points=True,
-            #     time_bin_size=None,
-            # )
-
-            # Diagnostic: temporal and vertical distribution of the points
-            # sampled by the current matching strategy.
-            # final_sampled_points = final_pc_right_corrected[
-            #     right_match_idx_all
-            # ]
-            final_sampled_times = time_right[right_match_idx_all]
-
-            # plot_sampled_points_time_z(
-            #     window_start=window_start,
-            #     window_end=window_start + window_duration,
-            #     sampled_points=final_sampled_points,
-            #     sampled_times=final_sampled_times,
-            #     window_id=window_index,
-            #     save_path=os.path.join(
-            #         kin_cal.output_dir,
-            #         f"window_{window_index}_sampling_time_z.png",
-            #     ),
-            #     show=False,
-            # )
-
-            # Optional diagnostic: detect the plant time interval.
-            plant_interval = detect_plant_time_interval(
-                point_cloud=pc_right,
-                point_times=time_right,
-                window_start=window_start,
-            )
-
-            if plant_interval is not None:
-                plant_start_time = plant_interval["plant_start_time"]
-                plant_end_time = plant_interval["plant_end_time"]
 
         # ==============================================================
         # 6. Final export after all sliding-window updates are complete

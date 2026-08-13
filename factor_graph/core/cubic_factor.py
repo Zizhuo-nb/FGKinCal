@@ -2,8 +2,7 @@ import numpy as np
 from src.config.sICPconfig import sICPconfig
 from sklearn.neighbors import NearestNeighbors
 from scipy.spatial.transform import Rotation
-from factor_graph.tool.tool import rigid_transform
-from factor_graph.tool.tool import icp_error_jacobian
+
 import random
 
 
