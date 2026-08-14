@@ -230,22 +230,6 @@ class FactorGraphOptimizerCubicSplineBatch:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     def match_group(self,pc_left, pc_right_corrected, right_idx, pc_right_original):
         icp = CubicIcpFactor(pc_left,pc_right_corrected)
         matching, filtered_idx = icp.matching(self.config)

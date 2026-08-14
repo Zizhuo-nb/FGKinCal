@@ -6,7 +6,7 @@
     "ICPConfig": {
         "maxiterations": 50,
         "Voxelization": {
-            "use": true,
+            "use":false,
             "voxelsize": 0.06
         },
         "Matching": {

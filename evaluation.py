@@ -56,7 +56,7 @@
 
 
 # if __name__ == "__main__":
-#     analyze_m3c2(r"F:\UNIVERSITY_BONN\master_thesis\working_space\evaluat_file\FOR_P151\M3C2_static_pointCloud.txt")
+#     analyze_m3c2(r"F:\UNIVERSITY_BONN\master_thesis\working_space\evaluat_file\FOR_P151\M3C2_batch.txt")
 
 
 
@@ -125,5 +125,5 @@ def plot_spline_csv(csv_path, num_samples=200, save_path="spline_6dof.png"):
 
 
 if __name__ == "__main__":
-    csv_path = "spline_coefficients.csv"   # 改成你的文件路径
+    csv_path = r"F:\UNIVERSITY_BONN\master_thesis\working_space\FGKinCal\output\spline_coefficients.csv"   # 改成你的文件路径
     plot_spline_csv(csv_path)
