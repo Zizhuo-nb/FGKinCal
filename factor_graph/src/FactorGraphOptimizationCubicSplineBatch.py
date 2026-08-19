@@ -1,5 +1,4 @@
 import numpy as np
-from src.config.sICPconfig import sICPconfig
 from src.core.KinematicCalibration import KinematicCalibration
 from factor_graph.core.cubic_factor import CubicIcpFactor
 from factor_graph.core.gtsam_cubic_spline_optimizer import (
@@ -39,7 +38,7 @@ class FactorGraphOptimizerCubicSplineBatch:
         self.configfile = configfile
         self.plot_id = plot_id
         self.date = date
-        self.config = sICPconfig()
+       
 
 
     def run(self):
@@ -55,7 +54,7 @@ class FactorGraphOptimizerCubicSplineBatch:
         kin_cal.loadconfig()
         kin_cal.loadcalibration()
         kin_cal.loaddata()
-
+        self.config = kin_cal.config
         idx_left, idx_right = kin_cal.get_alignment_intervals()
         all_windows = {}
        

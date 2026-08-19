@@ -7,8 +7,8 @@
         "maxiterations": 50,
         "convergence_threshold": 0.001,
         "Voxelization": {
-            "use": false,
-            "voxelsize": 0.06
+            "use": true,
+            "voxelsize": 0.015
         },
         "Matching": {
             "maxdist": 0.06
@@ -16,19 +16,19 @@
         "Normals": {
             "radius": 0.01,
             "minpoints": 10,
-            "maxpoints": 1000000000000000000000000000000000
+            "maxpoints": 1000
         },
         "Rejection": {
             "normalangle": {
-                "use": false,
+                "use": true,
                 "maxangle": 40
             },
             "roughness": {
-                "use": false,
+                "use": true,
                 "max_roughness": 0.005
             },
             "MAD": {
-                "use": false
+                "use": true
             }
         }
     },

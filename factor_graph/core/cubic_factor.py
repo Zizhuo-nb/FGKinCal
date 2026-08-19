@@ -15,8 +15,10 @@ class CubicIcpFactor:
         self.xyzm2 = None  # point matches 2
 
     def matching(self, config : sICPconfig):
-            # pc1_downsampled, _ = self.voxel_downsampling(self.pc1, config.voxel_size)
-            pc1_downsampled = self.pc1
+            if config.voxelization_use:
+                pc1_downsampled, _ = self.voxel_downsampling(self.pc1, config.voxel_size)
+            else:
+                pc1_downsampled = self.pc1
             nbrs = NearestNeighbors(n_neighbors=1, algorithm="auto").fit(self.pc2)
             dNN, idxNN = nbrs.kneighbors(pc1_downsampled)
     

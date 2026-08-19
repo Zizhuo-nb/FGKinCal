@@ -1,4 +1,3 @@
-from factor_graph.src.FactorGraphOptimizerCubicSpline1 import FactorGraphOptimizerCubicSpline
 from factor_graph.src.FactorGraphOptimizationCubicSplineBatch import FactorGraphOptimizerCubicSplineBatch
 
 import click

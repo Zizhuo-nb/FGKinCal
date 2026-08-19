@@ -7,8 +7,8 @@ from factor_graph.core.cubic_factor import icp_error_func,c0_error_func,c1_error
 
 def gtsam_optimize_single_cubic_icp(
     windows,
-    icp_sigma=0.01,
-    c0_sigma=0.01,
+    icp_sigma=0.001,
+    c0_sigma=0.001,
     c1_sigma=0.01,
     c2_sigma=0.01,
 ):
