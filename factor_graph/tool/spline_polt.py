@@ -23,22 +23,37 @@ def save_spline_coefficients(windows, output_dir):
     )
 
 
-def plot_splines(windows, output_dir):
-    names = ["rx", "ry", "rz", "tx", "ty", "tz"]
+def plot_splines(windows, output_dir, num_samples=200):
+    dof_names = [
+        "rotvec_x",
+        "rotvec_y",
+        "rotvec_z",
+        "tx",
+        "ty",
+        "tz",
+    ]
 
     fig, axes = plt.subplots(
-        6, 1,
+        6,
+        1,
         figsize=(12, 14),
-        sharex=True
+        sharex=True,
     )
 
-    for window_id in sorted(windows):
+    # 按 window_start 排序
+    window_ids = sorted(
+        windows,
+        key=lambda window_id: windows[window_id]["window_start"]
+    )
+
+    for window_id in window_ids:
         data = windows[window_id]
 
         start = data["window_start"]
         duration = data["window_duration"]
+        end = start + duration
 
-        t = np.linspace(start, start + duration, 100)
+        t = np.linspace(start, end, num_samples)
         u = (t - start) / duration
 
         basis = np.column_stack([
@@ -49,23 +64,50 @@ def plot_splines(windows, output_dir):
         ])
 
         coeff = np.asarray(
-            data["coefficients"]
+            data["coefficients"],
+            dtype=float,
         ).reshape(6, 4)
 
         values = basis @ coeff.T
 
-        for i in range(6):
-            axes[i].plot(t, values[:, i])
-            axes[i].set_ylabel(names[i])
-            axes[i].grid(True)
+        for k in range(6):
+            axes[k].plot(
+                t,
+                values[:, k],
+                linewidth=1.2,
+            )
+
+            axes[k].axvline(
+                start,
+                linestyle="--",
+                alpha=0.3,
+            )
+
+            axes[k].axvline(
+                end,
+                linestyle="--",
+                alpha=0.3,
+            )
+
+            axes[k].set_ylabel(dof_names[k])
+            axes[k].grid(True)
 
     axes[-1].set_xlabel("Time [s]")
+
+    fig.suptitle(
+        "6-DoF Cubic Spline Over All Windows",
+        fontsize=14,
+    )
 
     plt.tight_layout()
 
     plt.savefig(
-        os.path.join(output_dir, "spline_6dof.png"),
-        dpi=200
+        os.path.join(
+            output_dir,
+            "spline_6dof.png",
+        ),
+        dpi=200,
+        bbox_inches="tight",
     )
 
     plt.close()

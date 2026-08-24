@@ -96,7 +96,8 @@ class CubicIcpFactor:
             # Compute mean normal and point-to-plane distance
             idx = sp < 0
             n2[idx] = -n2[idx]
-            n = 0.5 * (n1 + n2)
+            # n = 0.5 * (n1 + n2)
+            n = n1
             dx = self.mx2 - self.mx1 
             p2p_d = np.sum(n * dx, axis=1)
            
@@ -498,6 +499,8 @@ def c2_error_func(
 
     return error_func
 
-    
+
+
+
 
     

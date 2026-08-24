@@ -5,7 +5,7 @@
     },
     "ICPConfig": {
         "maxiterations": 50,
-        "convergence_threshold": 0.001,
+        "convergence_threshold": 5e-6,
         "Voxelization": {
             "use": true,
             "voxelsize": 0.015

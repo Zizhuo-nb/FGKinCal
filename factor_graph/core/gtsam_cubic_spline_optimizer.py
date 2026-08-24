@@ -1,15 +1,15 @@
 import gtsam
 import numpy as np
 
-from factor_graph.core.cubic_factor import icp_error_func,c0_error_func,c1_error_func,c2_error_func
+from factor_graph.core.cubic_factor import icp_error_func,c0_error_func,c1_error_func,c2_error_func,prior_error_func
 
 
 
 def gtsam_optimize_single_cubic_icp(
     windows,
-    icp_sigma=0.001,
+    icp_sigma=0.01,
     c0_sigma=0.001,
-    c1_sigma=0.01,
+    c1_sigma=0.002,
     c2_sigma=0.01,
 ):
     graph = gtsam.NonlinearFactorGraph()
@@ -62,7 +62,8 @@ def gtsam_optimize_single_cubic_icp(
 
         icp_noise = gtsam.noiseModel.Isotropic.Sigma(
             matching.shape[0],
-            icp_sigma,
+            # icp_sigma,
+            icp_sigma * np.sqrt(matching.shape[0])
         )
 
         graph.add(
@@ -85,7 +86,11 @@ def gtsam_optimize_single_cubic_icp(
     c2_noise = gtsam.noiseModel.Isotropic.Sigma(
         6,
         c2_sigma,
-    )
+     )
+    # c0_noise = gtsam.noiseModel.Constrained.All(6)
+    # c1_noise = gtsam.noiseModel.Constrained.All(6)
+    # c2_noise = gtsam.noiseModel.Constrained.All(6)
+    
 
     for i in range(len(window_ids) - 1):
         left_id = window_ids[i]
@@ -127,6 +132,7 @@ def gtsam_optimize_single_cubic_icp(
             )
         )
 
+  
     # 3. 联合优化
     optimizer = gtsam.LevenbergMarquardtOptimizer(
         graph,

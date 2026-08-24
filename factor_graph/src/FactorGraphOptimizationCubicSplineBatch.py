@@ -18,9 +18,7 @@ from factor_graph.tool.spline_polt import (
 
 
 class FactorGraphOptimizerCubicSplineBatch:
-    MAX_OUTER_INTERATIONS = 50
-    OUTER_RMSE_THRESHOLD = 1e-5
-    ICP_SIGMA = 0.01
+    
 
 
     def __init__(
@@ -48,6 +46,8 @@ class FactorGraphOptimizerCubicSplineBatch:
             self.calibration_dir,
             self.configfile,
         )
+        
+       
 
         kin_cal.copy_data(self.plot_id, self.date)
         kin_cal.print_info()
@@ -57,6 +57,7 @@ class FactorGraphOptimizerCubicSplineBatch:
         self.config = kin_cal.config
         idx_left, idx_right = kin_cal.get_alignment_intervals()
         all_windows = {}
+        
        
 
         for window_index in range(len(idx_right)):
@@ -130,7 +131,7 @@ class FactorGraphOptimizerCubicSplineBatch:
 
 
         previous_rmse = None
-        for outer_iteration in range(self.MAX_OUTER_INTERATIONS):
+        for outer_iteration in range(self.config.max_iterations):
             print(f"[Macthing all] outer={outer_iteration +1},")
             for window_current_id, data in all_windows.items():
                 pc_right_corrected = correct_full_right_cloud(
@@ -142,12 +143,22 @@ class FactorGraphOptimizerCubicSplineBatch:
                     window_start=data["window_start"],
                     window_duration=data["window_duration"],
                 )
-                matching_non_ground, idx_non_ground = self.match_group(
-                    data["pc_left_non_ground"],
-                    pc_right_corrected[data["right_non_ground_idx"]],
-                    data["right_non_ground_idx"],
-                    data["pc_right"],
-                )
+                
+                if(len(data["pc_left_non_ground"]) ==0 or len(data["right_non_ground_idx"]) == 0):
+                    matching_non_ground = np.empty((0,6))
+                    idx_non_ground = np.empty(0, dtype = np.int64)
+                else:   
+                    matching_non_ground, idx_non_ground = self.match_group(
+                        data["pc_left_non_ground"],
+                        pc_right_corrected[data["right_non_ground_idx"]],
+                        data["right_non_ground_idx"],
+                        data["pc_right"],
+                    )
+                if (
+                    len(data["pc_left_ground"]) == 0
+                    or len(data["right_ground_idx"]) == 0
+                ):
+                    raise ValueError("Ground points are not enough!")
 
                 matching_ground, idx_ground = self.match_group(
                     data["pc_left_ground"],
@@ -185,7 +196,6 @@ class FactorGraphOptimizerCubicSplineBatch:
                 )
             coefficients_result, rmse =gtsam_optimize_single_cubic_icp(
                 windows=all_windows,
-                icp_sigma=self.ICP_SIGMA,
             )
             for window_id, coefficients in coefficients_result.items():
                 all_windows[window_id]["coefficients"] = coefficients
@@ -197,7 +207,7 @@ class FactorGraphOptimizerCubicSplineBatch:
             )
             if (
                 previous_rmse is not None
-                and abs(previous_rmse - rmse) < self.OUTER_RMSE_THRESHOLD
+                and abs(previous_rmse - rmse) < self.config.convergence_threshold
             ):
                 print("Outer loop converged.")
                 break
