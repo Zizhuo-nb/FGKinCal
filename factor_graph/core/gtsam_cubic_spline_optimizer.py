@@ -74,7 +74,6 @@ def gtsam_optimize_single_cubic_icp(
             )
         )
 
-    # 2. 相邻窗口之间添加C0、C1、C2连续因子
     c0_noise = gtsam.noiseModel.Isotropic.Sigma(
         6,
         c0_sigma,
@@ -133,7 +132,7 @@ def gtsam_optimize_single_cubic_icp(
         )
 
   
-    # 3. 联合优化
+   
     optimizer = gtsam.LevenbergMarquardtOptimizer(
         graph,
         initial_values,
@@ -141,7 +140,6 @@ def gtsam_optimize_single_cubic_icp(
 
     result = optimizer.optimize()
 
-    # 4. 取出每个窗口的系数
     coefficients_result = {}
 
     total_squared_error = 0.0
