@@ -38,5 +38,17 @@
             "y": 5608006,
             "z": 0
         }
+    },
+
+    "SplineOptmizerConfig":{
+        "CSFThreshould": 0.05,
+
+        "Segmentation":{
+            "use": true,
+            "plant_voxel_use": true,
+            "ground_voxel": 0.007
+        },
+
+        "boundary_control": false 
     }
 }

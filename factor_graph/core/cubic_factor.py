@@ -14,8 +14,10 @@ class CubicIcpFactor:
         self.xyzm1 = None # point matches 1
         self.xyzm2 = None  # point matches 2
 
-    def matching(self, config : sICPconfig):
-            if config.voxelization_use:
+    def matching(self, config, voxelization_use = None):
+            if voxelization_use is None:
+                voxelization_use = config.voxelization_use
+            if voxelization_use:
                 pc1_downsampled, _ = self.voxel_downsampling(self.pc1, config.voxel_size)
             else:
                 pc1_downsampled = self.pc1

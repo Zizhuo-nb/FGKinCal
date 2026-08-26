@@ -20,6 +20,11 @@ class sICPconfig:
     normal_angle_use = bool
     normal_angle_max = float
     mad_use = bool
+    segment_use = bool
+    csf_shreshould = float
+    ground_voxel = float
+    plant_voxelization_use = bool
+    boundary_control = bool
     txyz: np.ndarray
 
     def __init__(self):
@@ -42,6 +47,11 @@ class sICPconfig:
         self.normal_angle_use = True
         self.normal_angle_max = 40
         self.mad_use = True
+        self.segment_use = True
+        self.csf_shreshould = 0.05
+        self.ground_voxel = 0.007
+        self.plant_voxelization_use = True
+        self.boundary_control = False
 
         # Georeferencing Config
         self.txyz = np.array([0, 0, 0])
@@ -72,6 +82,13 @@ class sICPconfig:
         self.normal_angle_use = config["ICPConfig"]["Rejection"]["normalangle"].get("use")
         self.normal_angle_max = config["ICPConfig"]["Rejection"]["normalangle"].get("maxangle")
         self.mad_use = config["ICPConfig"]["Rejection"]["MAD"].get("use")
+        
+        #SplineConfig
+        self.csf_shreshould = config["SplineOptmizerConfig"].get("CSFThreshould")
+        self.segment_use = config["SplineOptmizerConfig"]["Segmentation"].get("use")
+        self.ground_voxel = config["SplineOptmizerConfig"]["Segmentation"].get("ground_voxel")
+        self.plant_voxelization_use = config["SplineOptmizerConfig"]["Segmentation"].get("plant_voxel_use")
+        self.boundary_control = config["SplineOptmizerConfig"].get("boundary_control")
 
         self.txyz = np.array( [config["GeorefConfig"]["globaloffset"].get("x"),
                                config["GeorefConfig"]["globaloffset"].get("y"),
@@ -121,7 +138,19 @@ class sICPconfig:
                     "y": float(self.txyz[1]),
                     "z": float(self.txyz[2])
                 }
+            },
+            "SplineOptmizerConfig":{
+                "CSFThreshould": self.csf_shreshould,
+
+                "Segmentation":{
+                    "use": self.segment_use,
+                    "plant_voxel_use": self.plant_voxelization_use,
+                    "ground_voxel": self.ground_voxel,
+                },
+                
+                "boundary_control": self.boundary_control
             }
+            
         }
 
         # Write the dictionary to JSON file
@@ -165,9 +194,22 @@ class sICPconfig:
         table3.add_row("Global Offset X", str(self.txyz[0]))
         table3.add_row("Global Offset Y", str(self.txyz[1]))
         table3.add_row("Global Offset Z", str(self.txyz[2]))
+        
+        table4 = Table()
+        table4.add_column("SplineOptimizer Prameter", style="cyan")
+        table4.add_column("Value       ", style="magenta")
+        table4.add_row("CSF Threshould", str(self.csf_shreshould))
+        table4.add_row("segmentaion use", str(self.segment_use))
+        table4.add_row("ground voxel", str(self.ground_voxel))
+        table4.add_row("plant_voxel_use", str(self.plant_voxelization_use))
+        table4.add_row("boundary_control", str(self.boundary_control))
+   
+        
+        
 
 
         # Display the table
         console.print(table1)
         console.print(table2)
         console.print(table3)
+        console.print(table4)
