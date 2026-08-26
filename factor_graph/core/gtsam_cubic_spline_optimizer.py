@@ -1,7 +1,7 @@
 import gtsam
 import numpy as np
 
-from factor_graph.core.cubic_factor import icp_error_func,c0_error_func,c1_error_func,c2_error_func,prior_error_func
+from factor_graph.core.cubic_factor import icp_error_func,c0_error_func,c1_error_func,c2_error_func,boundary_c1_error_func,boundary_c2_error_func
 
 
 
@@ -86,12 +86,60 @@ def gtsam_optimize_single_cubic_icp(
         6,
         c2_sigma,
      )
-    # c0_noise = gtsam.noiseModel.Constrained.All(6)
-    # c1_noise = gtsam.noiseModel.Constrained.All(6)
-    # c2_noise = gtsam.noiseModel.Constrained.All(6)
+
     
 
     for i in range(len(window_ids) - 1):
+        # # ============================
+        # # boundary constraints
+        # # ============================
+
+        # first_id = window_ids[0]
+        # last_id = window_ids[-1]
+
+        # first_key = keys[first_id]
+        # last_key = keys[last_id]
+
+        # first_duration = windows[first_id]["window_duration"]
+        # last_duration = windows[last_id]["window_duration"]
+
+        # # 起点：C1 = 0
+        # graph.add(
+        #     gtsam.CustomFactor(
+        #         c1_noise,
+        #         [first_key],
+        #         boundary_c1_error_func(first_duration, is_start=True),
+        #     )
+        # )
+
+        # # 起点：C2 = 0
+        # graph.add(
+        #     gtsam.CustomFactor(
+        #         c2_noise,
+        #         [first_key],
+        #         boundary_c2_error_func(first_duration, is_start=True),
+        #     )
+        # )
+
+        # # 终点：C1 = 0
+        # graph.add(
+        #     gtsam.CustomFactor(
+        #         c1_noise,
+        #         [last_key],
+        #         boundary_c1_error_func(last_duration, is_start=False),
+        #     )
+        # )
+
+        # # 终点：C2 = 0
+        # graph.add(
+        #     gtsam.CustomFactor(
+        #         c2_noise,
+        #         [last_key],
+        #         boundary_c2_error_func(last_duration, is_start=False),
+        #     )
+        # )
+        
+        # #===========================
         left_id = window_ids[i]
         right_id = window_ids[i + 1]
 

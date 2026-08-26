@@ -502,5 +502,51 @@ def c2_error_func(
 
 
 
+def boundary_c1_error_func(duration, is_start):
+    if is_start:
+        basis = np.array([0., 1., 0., 0.]) / duration
+    else:
+        basis = np.array([0., 1., 2., 3.]) / duration
 
-    
+    jacobian = np.kron(
+        np.eye(6),
+        basis.reshape(1, 4)
+    )
+
+    def error_func(this, values, H):
+        key = this.keys()[0]
+        coefficients = values.atVector(key).reshape(6, 4)
+
+        residual = coefficients @ basis  # 希望 = 0
+
+        if H is not None:
+            H[0] = jacobian
+
+        return residual
+
+    return error_func
+
+
+def boundary_c2_error_func(duration, is_start):
+    if is_start:
+        basis = np.array([0., 0., 2., 0.]) / duration**2
+    else:
+        basis = np.array([0., 0., 2., 6.]) / duration**2
+
+    jacobian = np.kron(
+        np.eye(6),
+        basis.reshape(1, 4)
+    )
+
+    def error_func(this, values, H):
+        key = this.keys()[0]
+        coefficients = values.atVector(key).reshape(6, 4)
+
+        residual = coefficients @ basis  # 希望 = 0
+
+        if H is not None:
+            H[0] = jacobian
+
+        return residual
+
+    return error_func
