@@ -202,8 +202,8 @@ class FactorGraphOptimizerCubicSplineBatch:
     
     
         save_spline_coefficients(
-        all_windows,
-        kin_cal.output_dir,
+            all_windows,
+            kin_cal.output_dir,
         )
         
         plot_splines(

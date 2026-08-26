@@ -18,6 +18,40 @@ def gtsam_optimize_single_cubic_icp(
 
     window_ids = sorted(windows.keys())
     keys = {}
+    
+    #=================
+    all_residuals = []
+
+    for window_id in window_ids:
+        data = windows[window_id]
+
+        coefficients_current = np.asarray(
+            data["coefficients"],
+            dtype=float,
+        ).reshape(24)
+
+        residual, _ = icp_error_func(
+            coefficients_current,
+            data["matching"],
+            data["pcr_idx"],
+            data["time_right"],
+            data["rotation_right"],
+            data["translation_right"],
+            data["window_start"],
+            data["window_duration"],
+        )
+
+        all_residuals.append(residual)
+
+    all_residuals = np.concatenate(all_residuals)
+
+    icp_sigma_est = np.sqrt(
+        np.mean(all_residuals ** 2)
+    )
+
+    print(f"Estimated ICP sigma = {icp_sigma_est:.6f}")
+    
+    #=================
 
     # 1. 每个窗口建立一个24维节点和一个ICP因子
     for window_id in window_ids:
@@ -64,7 +98,8 @@ def gtsam_optimize_single_cubic_icp(
         icp_noise = gtsam.noiseModel.Isotropic.Sigma(
             matching.shape[0],
             # icp_sigma,
-            icp_sigma * np.sqrt(matching.shape[0] * 0.1)
+            # icp_sigma * np.sqrt(matching.shape[0] * 0.1)
+            icp_sigma_est
         )
 
         graph.add(
