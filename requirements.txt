@@ -11,6 +11,6 @@ plyfile
 alive_progress
 open3d
 rich
-gtsam==4.2
+gtsam==4.2.2
 scikit-learn
 cloth-simulation-filter
