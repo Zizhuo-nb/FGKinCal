@@ -1,0 +1,17 @@
+numpy==1.26.4
+
+matplotlib
+colorama
+click
+rasterio
+pandas
+scipy
+laspy
+requests
+plyfile
+alive_progress
+open3d
+rich
+gtsam==4.2
+scikit-learn
+cloth-simulation-filter
