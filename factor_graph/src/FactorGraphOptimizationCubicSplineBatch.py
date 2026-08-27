@@ -167,7 +167,7 @@ class FactorGraphOptimizerCubicSplineBatch:
                     data["pcr_idx_ground"] = idx_ground
 
                     print(
-                        f"matching window = {window_current_id},"
+                        f"matching window = {window_current_id+1},"
                         f"plant={len(matching_non_ground)},"
                         f"ground={len(matching_ground)},"
                         f"total={len(matching_all)},")
@@ -181,13 +181,17 @@ class FactorGraphOptimizerCubicSplineBatch:
                     )
                     data["matching"] = matching_all
                     data["pcr_idx"] = idx_all
+                    print(
+                        f"matching window = {window_current_id+1}, "
+                        f"total={len(matching_all)},"
+                    )
                 
             coefficients_result, rmse =gtsam_optimize_single_cubic_icp(windows=all_windows,boundary_control=self.config.boundary_control)   
             for window_id, coefficients in coefficients_result.items():
                 all_windows[window_id]["coefficients"] = coefficients
 
             print(
-                f"Active windows: {list(all_windows.keys())}, "
+                f"Active windows: {[k+1 for k in all_windows.keys()]}, "
                 f"outer iteration: {outer_iteration + 1}, "
                 f"RMSE={rmse:.8f}"
             )

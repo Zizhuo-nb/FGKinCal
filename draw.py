@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation
 
 
-SPLINE_CSV = (r"/home/iggstudent/zizhuo/FGKinCal/output/spline_coefficients.csv")
+SPLINE_CSV = (r"F:\UNIVERSITY_BONN\master_thesis\working_space\FGKinCal\output\spline_coefficients.csv")
 
 
 def rotmat_x(a):

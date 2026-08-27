@@ -8,7 +8,7 @@
         "convergence_threshold": 1e-5,
         "Voxelization": {
             "use": true,
-            "voxelsize": 0.015
+            "voxelsize": 0.06
         },
         "Matching": {
             "maxdist": 0.06
@@ -49,6 +49,6 @@
             "ground_voxel": 0.007
         },
 
-        "boundary_control": false
+        "boundary_control": true
     }
 }

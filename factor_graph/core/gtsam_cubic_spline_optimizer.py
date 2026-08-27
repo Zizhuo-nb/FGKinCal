@@ -99,7 +99,7 @@ def gtsam_optimize_single_cubic_icp(
             matching.shape[0],
             # icp_sigma,
             # icp_sigma * np.sqrt(matching.shape[0] * 0.1)
-            icp_sigma_est
+            icp_sigma_est * np.sqrt(matching.shape[0])
         )
 
         graph.add(

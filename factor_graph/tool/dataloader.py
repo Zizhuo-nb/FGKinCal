@@ -125,11 +125,14 @@ def get_non_ground_indices(points, config_threshould,ground_voxel,name="cloud"):
     # EXPERIMENT HOOK: ground-point downsampling
     # ------------------------------------------------------------------
     raw_ground_count = len(ground_idx)
-    ground_idx = voxel_downsample_indices(
-        points,
-        ground_idx,
-        voxel_size=ground_voxel,
-    )
+    if name=="right":
+        ground_idx = ground_idx
+    else:
+        ground_idx = voxel_downsample_indices(
+            points,
+            ground_idx,
+            voxel_size=ground_voxel,
+        )
 
     print(
         f"[CSF] {name}: "

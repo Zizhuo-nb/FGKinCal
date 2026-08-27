@@ -55,7 +55,7 @@ def analyze_m3c2(file_path):
 
 
 if __name__ == "__main__":
-    analyze_m3c2(r"F:\UNIVERSITY_BONN\master_thesis\working_space\evaluat_file\FOR_P151\M3C2_batch.txt")
+    analyze_m3c2(r"F:\UNIVERSITY_BONN\master_thesis\working_space\evaluat_file\FOR_P151\M3C2 output scale=0.txt")
 
 
 
