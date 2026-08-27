@@ -17,7 +17,6 @@ def analyze_m3c2(file_path):
     print("valid points:", np.sum(valid))
     print("invalid / nan points:", len(d) - np.sum(valid))
     print()
-
     d = d[valid]
     uncertainty = uncertainty[valid]
 
