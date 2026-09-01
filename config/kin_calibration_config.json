@@ -1,14 +1,14 @@
 {
     "IntervalConfig": {
-        "windowsize": 0.7,
-        "stepsize": 0.7
+        "windowsize": 1,
+        "stepsize": 1
     },
     "ICPConfig": {
         "maxiterations": 50,
         "convergence_threshold": 1e-5,
         "Voxelization": {
             "use": true,
-            "voxelsize": 0.06
+            "voxelsize": 0.015
         },
         "Matching": {
             "maxdist": 0.06
@@ -45,10 +45,11 @@
 
         "Segmentation":{
             "use": true,
-            "plant_voxel_use": true,
-            "ground_voxel": 0.007
+            "plant_voxel_use":true,
+            "plant_voxel_if_false": 0.02,
+            "ground_voxel": 0.008
         },
 
-        "boundary_control": true
+        "boundary_control": false
     }
 }

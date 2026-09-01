@@ -51,6 +51,7 @@ class sICPconfig:
         self.csf_shreshould = 0.05
         self.ground_voxel = 0.007
         self.plant_voxelization_use = True
+        self.plant_voxel = 0.01
         self.boundary_control = False
 
         # Georeferencing Config
@@ -89,7 +90,9 @@ class sICPconfig:
         self.ground_voxel = config["SplineOptmizerConfig"]["Segmentation"].get("ground_voxel")
         self.plant_voxelization_use = config["SplineOptmizerConfig"]["Segmentation"].get("plant_voxel_use")
         self.boundary_control = config["SplineOptmizerConfig"].get("boundary_control")
-
+        self.plant_voxel = config["SplineOptmizerConfig"]["Segmentation"].get("plant_voxel_if_false")
+        
+        
         self.txyz = np.array( [config["GeorefConfig"]["globaloffset"].get("x"),
                                config["GeorefConfig"]["globaloffset"].get("y"),
                                config["GeorefConfig"]["globaloffset"].get("z")] )
@@ -145,6 +148,7 @@ class sICPconfig:
                 "Segmentation":{
                     "use": self.segment_use,
                     "plant_voxel_use": self.plant_voxelization_use,
+                    "plant_voxel_if_false": self.plant_voxel,
                     "ground_voxel": self.ground_voxel,
                 },
                 
@@ -202,6 +206,7 @@ class sICPconfig:
         table4.add_row("segmentaion use", str(self.segment_use))
         table4.add_row("ground voxel", str(self.ground_voxel))
         table4.add_row("plant_voxel_use", str(self.plant_voxelization_use))
+        table4.add_row("plant_voxel_if_false", str(self.plant_voxel))        
         table4.add_row("boundary_control", str(self.boundary_control))
    
         

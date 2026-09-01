@@ -111,3 +111,37 @@ def plot_splines(windows, output_dir, num_samples=200):
     )
 
     plt.close()
+    
+    
+    
+    
+    
+def load_mean_spline_coefficients(csv_path):
+    data = np.loadtxt(
+        csv_path,
+        delimiter=",",
+    )
+    # Handle the case of only one window
+    if data.ndim == 1:
+        data = data.reshape(1, -1)
+
+    # First 3 columns are:
+    # window_id, window_start, window_duration
+    coefficients = data[:, 3:]
+
+    if coefficients.shape[1] != 24:
+        raise ValueError(
+            f"Expected 24 spline coefficients, "
+            f"but got {coefficients.shape[1]}"
+        )
+
+    # Mean over all windows
+    mean_coefficients = np.mean(
+        coefficients,
+        axis=0,
+    )
+
+    mean_matrix = mean_coefficients.reshape(6, 4)
+
+    return mean_coefficients, mean_matrix
+    

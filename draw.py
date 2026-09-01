@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation
 
 
-SPLINE_CSV = (r"F:\UNIVERSITY_BONN\master_thesis\working_space\FGKinCal\output\spline_coefficients.csv")
+SPLINE_CSV = (r"/home/iggstudent/zizhuo/FGKinCal/output/spline_coefficients.csv")
 
 
 def rotmat_x(a):
@@ -132,8 +132,21 @@ def plot_dynamic_extrinsic(csv_path, num_samples=200):
 
         for k in range(6):
             axes[k].plot(t, dynamic[:, k], linewidth=1.2)
+
+            axes[k].scatter(
+                t[-1],
+                dynamic[-1, k],
+                s=17,
+                color="blue",
+                zorder=5
+            )
+
             axes[k].set_ylabel(names[k])
             axes[k].grid(True, alpha=0.3)
+
+
+    axes[k].set_ylabel(names[k])
+    axes[k].grid(True, alpha=0.3)
 
     axes[-1].set_xlabel("Timestamp")
     fig.suptitle("Right Scanner Dynamic Extrinsic", fontsize=14)

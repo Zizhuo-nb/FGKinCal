@@ -1,5 +1,5 @@
 from factor_graph.src.FactorGraphOptimizationCubicSplineBatch import FactorGraphOptimizerCubicSplineBatch
-
+import time
 import click
 
 @click.command()
@@ -16,7 +16,7 @@ def main(parent_dir,
          configfile,
          plot_id,
          date):
-    
+    start_time = time.time()
 
     factorgraph = FactorGraphOptimizerCubicSplineBatch(parent_dir,
                               output_dir,
@@ -25,6 +25,8 @@ def main(parent_dir,
                               plot_id,
                               date)
     factorgraph.run()
+    end_time = time.time()
+    print(f"\nTotal running time: {end_time - start_time:.2f} seconds")
 
     
 if __name__ == "__main__":

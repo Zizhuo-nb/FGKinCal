@@ -19,8 +19,8 @@ class CubicIcpFactor:
                 voxelization_use = config.voxelization_use
             if voxelization_use:
                 pc1_downsampled, _ = self.voxel_downsampling(self.pc1, config.voxel_size)
-            else:
-                pc1_downsampled = self.pc1
+            elif voxelization_use == False:
+                pc1_downsampled, _ = self.voxel_downsampling(self.pc1, config.plant_voxel)
             nbrs = NearestNeighbors(n_neighbors=1, algorithm="auto").fit(self.pc2)
             dNN, idxNN = nbrs.kneighbors(pc1_downsampled)
     
@@ -504,22 +504,82 @@ def c2_error_func(
 
 
 
-def boundary_c1_error_func(duration, is_start):
+# def boundary_c1_error_func(mean_coefficients,duration, is_start):
+#     if is_start:
+#         basis = np.array([0., 1., 0., 0.]) / duration
+#     else:
+#         basis = np.array([0., 1., 2., 3.]) / duration
+
+#     jacobian = np.kron(
+#         np.eye(6),
+#         basis.reshape(1, 4)
+#     )
+
+#     def error_func(this, values, H):
+#         key = this.keys()[0]
+#         coefficients = values.atVector(key).reshape(6, 4)
+
+#         residual = coefficients @ basis  # 希望 = 0
+
+#         if H is not None:
+#             H[0] = jacobian
+
+#         return residual
+
+#     return error_func
+
+
+def boundary_c1_error_func(
+    mean_coefficients,
+    duration,
+    is_start,
+):
+
+    mean_coefficients = np.asarray(
+        mean_coefficients
+    ).reshape(6, 4)
+
     if is_start:
-        basis = np.array([0., 1., 0., 0.]) / duration
+        # First window: u = 0
+        basis_current = np.array(
+            [0., 1., 0., 0.]
+        ) / duration
+
+        # Prior window: u = 1
+        basis_prior = np.array(
+            [0., 1., 2., 3.]
+        ) / duration
+
     else:
-        basis = np.array([0., 1., 2., 3.]) / duration
+        # Last window: u = 1
+        basis_current = np.array(
+            [0., 1., 2., 3.]
+        ) / duration
+
+        # Prior window: u = 0
+        basis_prior = np.array(
+            [0., 1., 0., 0.]
+        ) / duration
 
     jacobian = np.kron(
         np.eye(6),
-        basis.reshape(1, 4)
+        basis_current.reshape(1, 4)
     )
 
     def error_func(this, values, H):
-        key = this.keys()[0]
-        coefficients = values.atVector(key).reshape(6, 4)
 
-        residual = coefficients @ basis  # 希望 = 0
+        key = this.keys()[0]
+
+        coefficients = (
+            values.atVector(key)
+            .reshape(6, 4)
+        )
+
+        residual = (
+            coefficients @ basis_current
+            -
+            mean_coefficients @ basis_prior
+        )
 
         if H is not None:
             H[0] = jacobian
@@ -529,22 +589,78 @@ def boundary_c1_error_func(duration, is_start):
     return error_func
 
 
-def boundary_c2_error_func(duration, is_start):
+# def boundary_c2_error_func(mean_coefficients,duration, is_start):
+#     if is_start:
+#         basis = np.array([0., 0., 2., 0.]) / duration**2
+#     else:
+#         basis = np.array([0., 0., 2., 6.]) / duration**2
+
+#     jacobian = np.kron(
+#         np.eye(6),
+#         basis.reshape(1, 4)
+#     )
+
+#     def error_func(this, values, H):
+#         key = this.keys()[0]
+#         coefficients = values.atVector(key).reshape(6, 4)
+
+#         residual = coefficients @ basis  # 希望 = 0
+
+#         if H is not None:
+#             H[0] = jacobian
+
+#         return residual
+
+#     return error_func
+
+
+def boundary_c2_error_func(
+    mean_coefficients,
+    duration,
+    is_start,
+):
+
+    mean_coefficients = np.asarray(
+        mean_coefficients
+    ).reshape(6, 4)
+
     if is_start:
-        basis = np.array([0., 0., 2., 0.]) / duration**2
+        basis_current = np.array(
+            [0., 0., 2., 0.]
+        ) / duration**2
+
+        basis_prior = np.array(
+            [0., 0., 2., 6.]
+        ) / duration**2
+
     else:
-        basis = np.array([0., 0., 2., 6.]) / duration**2
+        basis_current = np.array(
+            [0., 0., 2., 6.]
+        ) / duration**2
+
+        basis_prior = np.array(
+            [0., 0., 2., 0.]
+        ) / duration**2
 
     jacobian = np.kron(
         np.eye(6),
-        basis.reshape(1, 4)
+        basis_current.reshape(1, 4)
     )
 
     def error_func(this, values, H):
-        key = this.keys()[0]
-        coefficients = values.atVector(key).reshape(6, 4)
 
-        residual = coefficients @ basis  # 希望 = 0
+        key = this.keys()[0]
+
+        coefficients = (
+            values.atVector(key)
+            .reshape(6, 4)
+        )
+
+        residual = (
+            coefficients @ basis_current
+            -
+            mean_coefficients @ basis_prior
+        )
 
         if H is not None:
             H[0] = jacobian

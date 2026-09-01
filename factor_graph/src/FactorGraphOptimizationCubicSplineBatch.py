@@ -4,6 +4,8 @@ from factor_graph.tool.dataloader import window_data,get_non_ground_indices
 from factor_graph.tool.datasaver import correct_full_right_cloud,save_all_window_pointclouds
 from factor_graph.core.gtsam_cubic_spline_optimizer import gtsam_optimize_single_cubic_icp
 from factor_graph.tool.tool import save_spline_coefficients, plot_splines
+from factor_graph.tool.tool import load_mean_spline_coefficients
+
 from factor_graph.core.cubic_factor import CubicIcpFactor
 
 
@@ -185,8 +187,9 @@ class FactorGraphOptimizerCubicSplineBatch:
                         f"matching window = {window_current_id+1}, "
                         f"total={len(matching_all)},"
                     )
-                
-            coefficients_result, rmse =gtsam_optimize_single_cubic_icp(windows=all_windows,boundary_control=self.config.boundary_control)   
+            
+            mean_coefficients,_ = load_mean_spline_coefficients("output/spline_coefficients.csv")
+            coefficients_result, rmse =gtsam_optimize_single_cubic_icp(windows=all_windows,boundary_control=self.config.boundary_control,mean_coefficients= mean_coefficients)   
             for window_id, coefficients in coefficients_result.items():
                 all_windows[window_id]["coefficients"] = coefficients
 
