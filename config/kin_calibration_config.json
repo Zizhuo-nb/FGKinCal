@@ -1,7 +1,7 @@
 {
     "IntervalConfig": {
-        "windowsize": 1,
-        "stepsize": 1
+        "windowsize": 0.9,
+        "stepsize": 0.9
     },
     "ICPConfig": {
         "maxiterations": 50,
