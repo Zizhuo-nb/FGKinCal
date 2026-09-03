@@ -109,3 +109,58 @@ def save_all_window_pointclouds(output_dir, windows):
         f"Saved {len(windows)} windows as complete point clouds to: "
         f"{output_dir}"
     )
+
+
+
+# def save_all_window_pointclouds(output_dir, windows):
+#     """Save each window as separate point-cloud files."""
+
+#     os.makedirs(output_dir, exist_ok=True)
+
+#     # Sort by window ID so the output follows the original temporal order.
+#     for window_id in sorted(windows.keys()):
+#         data = windows[window_id]
+
+#         pc_right_corrected = correct_full_right_cloud(
+#             pc_r=data["pc_right"],
+#             time_r=data["time_right"],
+#             R_NB_r=data["rotation_right"],
+#             t_NB_r=data["translation_right"],
+#             coefficients=data["coefficients"],
+#             window_start=data["window_start"],
+#             window_duration=data["window_duration"],
+#         )
+
+#         # ============================================================
+#         # Save current window separately
+#         # ============================================================
+
+#         output_files = {
+#             f"window_{window_id}_left_utm.xyz":
+#                 data["pc_left"],
+
+#             f"window_{window_id}_right_original_utm.xyz":
+#                 data["pc_right"],
+
+#             f"window_{window_id}_right_corrected_utm.xyz":
+#                 pc_right_corrected,
+#         }
+
+#         for filename, point_cloud in output_files.items():
+#             np.savetxt(
+#                 os.path.join(output_dir, filename),
+#                 point_cloud,
+#                 fmt="%.6f",
+#             )
+
+#         print(
+#             f"Saved window {window_id}: "
+#             f"left={len(data['pc_left'])}, "
+#             f"right_original={len(data['pc_right'])}, "
+#             f"right_corrected={len(pc_right_corrected)}"
+#         )
+
+#     print(
+#         f"Saved {len(windows)} windows separately to: "
+#         f"{output_dir}"
+#     )

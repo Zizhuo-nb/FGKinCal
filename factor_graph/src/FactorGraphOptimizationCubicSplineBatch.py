@@ -5,6 +5,7 @@ from factor_graph.tool.datasaver import correct_full_right_cloud,save_all_window
 from factor_graph.core.gtsam_cubic_spline_optimizer import gtsam_optimize_single_cubic_icp
 from factor_graph.tool.tool import save_spline_coefficients, plot_splines
 from factor_graph.tool.tool import load_mean_spline_coefficients
+from factor_graph.core.boundary_control import compute_mean_center_extrinsic
 
 from factor_graph.core.cubic_factor import CubicIcpFactor
 
@@ -71,7 +72,8 @@ class FactorGraphOptimizerCubicSplineBatch:
                     pc_left,
                     self.config.csf_shreshould,
                     self.config.ground_voxel,
-                    name="left")
+                    name="right" if window_index == 0 or window_index == len(idx_right) - 1 else "left",)
+                
                 right_non_ground_idx, right_ground_idx = get_non_ground_indices(
                     pc_right,
                     self.config.csf_shreshould,
@@ -150,6 +152,7 @@ class FactorGraphOptimizerCubicSplineBatch:
                         pc_right_corrected[data["right_ground_idx"]],
                         data["right_ground_idx"],
                         data["pc_right"],
+                        disable_filters=(window_current_id== min(all_windows.keys())),
                     )
                     if len(matching_ground) == 0:
                         raise ValueError("Ground point is not enough! Try to adjust the downsample/filtering")
@@ -188,11 +191,33 @@ class FactorGraphOptimizerCubicSplineBatch:
                         f"total={len(matching_all)},"
                     )
             
-            mean_coefficients,_ = load_mean_spline_coefficients("output/spline_coefficients.csv")
-            coefficients_result, rmse =gtsam_optimize_single_cubic_icp(windows=all_windows,boundary_control=self.config.boundary_control,mean_coefficients= mean_coefficients)   
+            # mean_coefficients,_ = load_mean_spline_coefficients("output/spline_coefficients.csv")
+            #=====compte mean center extrinsic windows that I need=============
+            mean_head_extrinsic = None
+            mean_tail_extrinsic = None
+            use_boundary_prior = (self.config.boundary_control and outer_iteration > 0)
+            if use_boundary_prior:
+                window_ids = sorted(all_windows.keys())
+                mean_extrinsic = compute_mean_center_extrinsic(
+                    all_windows,
+                    window_ids,
+                )
+
+                mean_head_extrinsic = mean_extrinsic.copy()
+                mean_tail_extrinsic = mean_extrinsic.copy()
+                
+            #==================================================================
+            coefficients_result, rmse =gtsam_optimize_single_cubic_icp(windows=all_windows,
+                boundary_control=use_boundary_prior,
+                mean_head_extrinsic=mean_head_extrinsic,
+                mean_tail_extrinsic=mean_tail_extrinsic,
+                boundary_rotation_sigma=0.01,
+                boundary_translation_sigma=0.01,)   
             for window_id, coefficients in coefficients_result.items():
                 all_windows[window_id]["coefficients"] = coefficients
-
+                
+            
+ 
             print(
                 f"Active windows: {[k+1 for k in all_windows.keys()]}, "
                 f"outer iteration: {outer_iteration + 1}, "
@@ -240,9 +265,9 @@ class FactorGraphOptimizerCubicSplineBatch:
     
     
     
-    def match_group(self,pc_left, pc_right_corrected, right_idx, pc_right_original,voxelization_use=None,):
+    def match_group(self,pc_left, pc_right_corrected, right_idx, pc_right_original,voxelization_use=None,disable_filters=False):
         icp = CubicIcpFactor(pc_left,pc_right_corrected)
-        matching, filtered_idx = icp.matching(self.config,voxelization_use=voxelization_use)
+        matching, filtered_idx = icp.matching(self.config,voxelization_use=voxelization_use,disable_filters=disable_filters)
         original_idx = right_idx[filtered_idx]
         matching_opt = matching.copy()
         matching_opt[:, 3:6] = pc_right_original[original_idx]

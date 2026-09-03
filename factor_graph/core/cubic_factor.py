@@ -14,7 +14,7 @@ class CubicIcpFactor:
         self.xyzm1 = None # point matches 1
         self.xyzm2 = None  # point matches 2
 
-    def matching(self, config, voxelization_use = None):
+    def matching(self, config, voxelization_use = None,disable_filters = False):
             if voxelization_use is None:
                 voxelization_use = config.voxelization_use
             if voxelization_use:
@@ -45,7 +45,7 @@ class CubicIcpFactor:
             self.idx2 = self.idx2[idx]
     
             # Filter by roughness
-            if config.roughness_filter_use:
+            if config.roughness_filter_use and not disable_filters:
                 idx = std1 <= config.max_roughness
 
                 self.mx1 = self.mx1[idx]
@@ -69,7 +69,7 @@ class CubicIcpFactor:
             n1 = n1[idx]
     
             # Filter by roughness value 
-            if config.roughness_filter_use:
+            if config.roughness_filter_use and not disable_filters:
                 idx = std2 <= config.max_roughness
 
                 self.mx1 = self.mx1[idx]
@@ -82,7 +82,7 @@ class CubicIcpFactor:
             sp = np.sum(n1 * n2, axis=1)
     
             # Filter by angle between normals
-            if config.normal_angle_use:
+            if config.normal_angle_use and not disable_filters:
                 alpha_max = np.radians(config.normal_angle_max)
                 th = np.cos(alpha_max)
 
@@ -104,7 +104,7 @@ class CubicIcpFactor:
             p2p_d = np.sum(n * dx, axis=1)
            
             # Filter by point-to-plane MAD
-            if config.mad_use:
+            if config.mad_use and not disable_filters:
                 median = np.median(p2p_d)
                 s_mad = 1.4826 * np.median(np.abs(p2p_d - median))
 

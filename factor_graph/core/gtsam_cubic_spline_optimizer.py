@@ -1,6 +1,6 @@
 import gtsam
 import numpy as np
-
+from factor_graph.core.boundary_control import boundary_error_func
 from factor_graph.core.cubic_factor import icp_error_func,c0_error_func,c1_error_func,c2_error_func,boundary_c1_error_func,boundary_c2_error_func
 
 
@@ -12,7 +12,11 @@ def gtsam_optimize_single_cubic_icp(
     c0_sigma=0.001,
     c1_sigma=0.002,
     c2_sigma=0.01,
-    mean_coefficients = None
+    mean_coefficients = None,
+    mean_head_extrinsic=None,
+    mean_tail_extrinsic=None,
+    boundary_rotation_sigma=0.01,
+    boundary_translation_sigma=0.01,
 ):
     graph = gtsam.NonlinearFactorGraph()
     initial_values = gtsam.Values()
@@ -124,10 +128,64 @@ def gtsam_optimize_single_cubic_icp(
         c2_sigma,
      )
 
+    # if boundary_control:
+    #     # # ============================
+    #     # # boundary constraints
+    #     # # ============================
+
+    #     first_id = window_ids[0]
+    #     last_id = window_ids[-1]
+
+    #     first_key = keys[first_id]
+    #     last_key = keys[last_id]
+
+    #     first_duration = windows[first_id]["window_duration"]
+    #     last_duration = windows[last_id]["window_duration"]
+
+    #     # 起点：C1 = 0
+    #     graph.add(
+    #         gtsam.CustomFactor(
+    #             c1_noise,
+    #             [first_key],
+    #             boundary_c1_error_func(mean_coefficients, first_duration, is_start=True),
+    #         )
+    #     )
+
+    #     # 起点：C2 = 0
+    #     graph.add(
+    #         gtsam.CustomFactor(
+    #             c2_noise,
+    #             [first_key],
+    #             boundary_c2_error_func(mean_coefficients,first_duration, is_start=True),
+    #         )
+    #     )
+
+    #     # 终点：C1 = 0
+    #     graph.add(
+    #         gtsam.CustomFactor(
+    #             c1_noise,
+    #             [last_key],
+    #             boundary_c1_error_func(mean_coefficients,last_duration, is_start=False),
+    #         )
+    #     )
+
+    #     # 终点：C2 = 0
+    #     graph.add(
+    #         gtsam.CustomFactor(
+    #             c2_noise,
+    #             [last_key],
+    #             boundary_c2_error_func(mean_coefficients,last_duration, is_start=False),
+    #         )
+    #     )
+        
+    #     # #===========================
+    
+    
     if boundary_control:
-        # # ============================
-        # # boundary constraints
-        # # ============================
+        if mean_head_extrinsic is None or mean_tail_extrinsic is None:
+            raise ValueError(
+                "Boundary control requires both head and tail mean extrinsics."
+            )
 
         first_id = window_ids[0]
         last_id = window_ids[-1]
@@ -135,46 +193,41 @@ def gtsam_optimize_single_cubic_icp(
         first_key = keys[first_id]
         last_key = keys[last_id]
 
-        first_duration = windows[first_id]["window_duration"]
-        last_duration = windows[last_id]["window_duration"]
+        # Residual order: rotation first, translation second.
+        boundary_noise = gtsam.noiseModel.Diagonal.Sigmas(
+            np.array([
+                boundary_rotation_sigma,
+                boundary_rotation_sigma,
+                boundary_rotation_sigma,
+                boundary_translation_sigma,
+                boundary_translation_sigma,
+                boundary_translation_sigma,
+            ], dtype=float)
+        )
 
-        # 起点：C1 = 0
+        # First window: pose at u = 0.
         graph.add(
             gtsam.CustomFactor(
-                c1_noise,
+                boundary_noise,
                 [first_key],
-                boundary_c1_error_func(mean_coefficients, first_duration, is_start=True),
+                boundary_error_func(
+                    mean_head_extrinsic,
+                    name="start",
+                ),
             )
         )
 
-        # 起点：C2 = 0
+        # Last window: pose at u = 1.
         graph.add(
             gtsam.CustomFactor(
-                c2_noise,
-                [first_key],
-                boundary_c2_error_func(mean_coefficients,first_duration, is_start=True),
-            )
-        )
-
-        # 终点：C1 = 0
-        graph.add(
-            gtsam.CustomFactor(
-                c1_noise,
+                boundary_noise,
                 [last_key],
-                boundary_c1_error_func(mean_coefficients,last_duration, is_start=False),
+                boundary_error_func(
+                    mean_tail_extrinsic,
+                    name="end",
+                ),
             )
         )
-
-        # 终点：C2 = 0
-        graph.add(
-            gtsam.CustomFactor(
-                c2_noise,
-                [last_key],
-                boundary_c2_error_func(mean_coefficients,last_duration, is_start=False),
-            )
-        )
-        
-        # #===========================
 
     for i in range(len(window_ids) - 1):
         left_id = window_ids[i]
