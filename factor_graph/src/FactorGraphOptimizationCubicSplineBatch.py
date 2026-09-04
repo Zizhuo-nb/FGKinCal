@@ -152,7 +152,7 @@ class FactorGraphOptimizerCubicSplineBatch:
                         pc_right_corrected[data["right_ground_idx"]],
                         data["right_ground_idx"],
                         data["pc_right"],
-                        disable_filters=(window_current_id== min(all_windows.keys())),
+                        disable_filters=(window_current_id== min(all_windows.keys()) or window_current_id== max(all_windows.keys())),
                     )
                     if len(matching_ground) == 0:
                         raise ValueError("Ground point is not enough! Try to adjust the downsample/filtering")

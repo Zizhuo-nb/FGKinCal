@@ -8,7 +8,7 @@
         "convergence_threshold": 1e-5,
         "Voxelization": {
             "use": true,
-            "voxelsize": 0.06
+            "voxelsize": 0.015
         },
         "Matching": {
             "maxdist": 0.06

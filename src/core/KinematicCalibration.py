@@ -620,6 +620,7 @@ class KinematicCalibration:
 
         while index_start < trajectory_length - 1:
             distance = 0
+            window_found = False
             for i in range(index_start, trajectory_length - 1):
                 dist = math.sqrt((self.TL.statesall[i, 1] - self.TL.statesall[i+1, 1])**2 + (self.TL.statesall[i, 2] - self.TL.statesall[i+1, 2])**2)
                 distance += dist
@@ -627,7 +628,16 @@ class KinematicCalibration:
                 if distance >= self.config.window_size:
                     index_end = i + 1
                     all_indices.append((index_start+idx0, index_end+idx0))
+                    window_found= True
                     break
+            if not window_found:
+                if distance >= self.config.window_size /2:
+                    all_indices.append((index_start+idx0, trajectory_length-1+idx0))
+                elif len(all_indices) > 0:
+                    previous_start, _ = all_indices[-1]
+                    all_indices[-1] = (previous_start,trajectory_length - 1 + idx0)
+                break
+                
 
             # Find new index_start based on the step size
             distance = 0
