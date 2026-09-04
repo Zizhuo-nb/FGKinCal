@@ -72,7 +72,7 @@ class FactorGraphOptimizerCubicSplineBatch:
                     pc_left,
                     self.config.csf_shreshould,
                     self.config.ground_voxel,
-                    name="right" if window_index == 0 or window_index == len(idx_right) - 1 else "left",)
+                    name="right" if window_index == 0 else "left")
                 
                 right_non_ground_idx, right_ground_idx = get_non_ground_indices(
                     pc_right,

@@ -109,9 +109,9 @@ def get_non_ground_indices(points, config_threshould,ground_voxel,name="cloud"):
     # ------------------------------------------------------------------
     csf = CSF.CSF()
     csf.params.bSloopSmooth = True
-    csf.params.cloth_resolution = 0.01
+    csf.params.cloth_resolution = 0.15
     csf.params.class_threshold = config_threshould
-    csf.params.rigidness = 1
+    csf.params.rigidness = 3
     csf.setPointCloud(points)
 
     ground = CSF.VecInt()
