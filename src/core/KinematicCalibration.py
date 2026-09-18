@@ -402,7 +402,7 @@ class KinematicCalibration:
             6. 把 xi 和窗口中心时间保存下来
         '''
 
-    def compute_kinematic_calibration_parameter(self):
+    def compute_kinematic_calibration_parameter(self, icp_param=None):
         """
         壹.1：
         总的来说，icp得到的每个窗口的修正量Px.txt，转换成左右扫描仪各自随时间变化的动态外参，然后插值到完整轨迹的时间戳，并且写入文件。总的流程：
@@ -420,8 +420,37 @@ class KinematicCalibration:
         读取的是前面run()生成的ICP结果文件PX.txt,每一行就是一个窗口的ICP对齐的结果。第二行代码是把含有NAN的行去掉。
         最后得到的icp_param就是一个矩阵，是N X 若干列，N是成功的ICP窗口的数量。
         '''
-        icp_param = np.loadtxt( fname=self.output_dir+"Px.txt", delimiter="," )
-        icp_param = icp_param[~np.isnan(icp_param).any(axis=1)]
+        # ---------------------------------------------------------
+        # Load discrete ICP results
+        # ---------------------------------------------------------
+        if icp_param is None:
+
+            # Original discrete method:
+            # read window-wise ICP results from Px.txt
+            icp_param = np.loadtxt(
+                fname=self.output_dir + "Px.txt",
+                delimiter=","
+            )
+
+        else:
+
+            # Spline experiment:
+            # directly use the provided window-center results
+            icp_param = np.asarray(
+                icp_param,
+                dtype=float
+            )
+
+
+        # Make sure the input is always a 2D array
+        if icp_param.ndim == 1:
+            icp_param = icp_param.reshape(1, -1)
+
+
+        # Remove invalid rows
+        icp_param = icp_param[
+            ~np.isnan(icp_param).any(axis=1)
+        ]
 
         # Initialize kinematic calibration parameter
         '''

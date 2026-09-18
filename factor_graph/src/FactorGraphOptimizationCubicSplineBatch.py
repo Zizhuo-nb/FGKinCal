@@ -1,7 +1,7 @@
 import numpy as np
 from src.core.KinematicCalibration import KinematicCalibration
 from factor_graph.tool.dataloader import window_data,get_non_ground_indices
-from factor_graph.tool.datasaver import correct_full_right_cloud,save_all_window_pointclouds
+from factor_graph.tool.datasaver import correct_full_right_cloud,save_all_window_pointclouds,correct_full_cloud
 from factor_graph.core.gtsam_cubic_spline_optimizer import gtsam_optimize_single_cubic_icp
 from factor_graph.tool.tool import save_spline_coefficients, plot_splines
 from factor_graph.tool.tool import load_mean_spline_coefficients
@@ -53,7 +53,7 @@ class FactorGraphOptimizerCubicSplineBatch:
         for window_index in range(len(idx_right)):
             print( f"\n{'=' * 70}\n" f"Processing window {window_index + 1}/{len(idx_right)} " f"(window_id={window_index})\n" f"{'=' * 70}")
             
-            (pc_left, pc_right, time_right, rotation_right, translation_right,) = window_data(window_index, kin_cal, idx_left, idx_right)
+            (pc_left, pc_right, time_right, rotation_right, translation_right,time_left, rotation_left, translation_left) = window_data(window_index, kin_cal, idx_left, idx_right)
             
             print(f"pc_left:           {pc_left.shape}")
             print(f"pc_right:          {pc_right.shape}")
@@ -62,6 +62,7 @@ class FactorGraphOptimizerCubicSplineBatch:
             print(f"translation_right: {translation_right.shape}")
             
             time_right = np.asarray(time_right).reshape(-1)
+            time_left = np.asarray(time_left).reshape(-1)
             window_start = np.min(time_right)
             window_duration = np.max(time_right) - window_start
             
@@ -90,11 +91,16 @@ class FactorGraphOptimizerCubicSplineBatch:
                     "time_right": time_right,
                     "rotation_right": rotation_right,
                     "translation_right": translation_right,
+                    "time_left": time_left,
+                    "rotation_left": rotation_left,
+                    "translation_left": translation_left,
                     "window_start": window_start,
                     "window_duration": window_duration,
                     # Segmented point-cloud data used for matching
                     "pc_left_non_ground": pc_left_non_ground,
                     "pc_left_ground": pc_left_ground,
+                    "left_non_ground_idx": left_non_ground_idx,
+                    "left_ground_idx": left_ground_idx,
                     "right_non_ground_idx": right_non_ground_idx,
                     "right_ground_idx": right_ground_idx,
                     # Current 24-dimensional spline coefficients
@@ -108,6 +114,9 @@ class FactorGraphOptimizerCubicSplineBatch:
                     "time_right": time_right,
                     "rotation_right": rotation_right,
                     "translation_right": translation_right,
+                    "time_left": time_left,
+                    "rotation_left": rotation_left,
+                    "translation_left": translation_left,
                     "window_start": window_start,
                     "window_duration": window_duration,
                     # Current 24-dimensional spline coefficients
@@ -121,25 +130,58 @@ class FactorGraphOptimizerCubicSplineBatch:
         for outer_iteration in range(self.config.max_iterations):
             print(f"[Macthing all] outer={outer_iteration +1},")
             for window_current_id, data in all_windows.items():
-                pc_right_corrected = correct_full_right_cloud(
-                    pc_r=data["pc_right"],
-                    time_r=data["time_right"],
-                    R_NB_r=data["rotation_right"],
-                    t_NB_r=data["translation_right"],
+                # pc_right_corrected = correct_full_right_cloud(
+                #     pc_r=data["pc_right"],
+                #     time_r=data["time_right"],
+                #     R_NB_r=data["rotation_right"],
+                #     t_NB_r=data["translation_right"],
+                #     coefficients=data["coefficients"],
+                #     window_start=data["window_start"],
+                #     window_duration=data["window_duration"],
+                # )
+                
+                pc_left_corrected = correct_full_cloud(
+                    pc=data["pc_left"],
+                    time=data["time_left"],
+                    R_NB=data["rotation_left"],
+                    t_NB=data["translation_left"],
                     coefficients=data["coefficients"],
                     window_start=data["window_start"],
                     window_duration=data["window_duration"],
+                    side="left",
+                )
+
+                pc_right_corrected = correct_full_cloud(
+                    pc=data["pc_right"],
+                    time=data["time_right"],
+                    R_NB=data["rotation_right"],
+                    t_NB=data["translation_right"],
+                    coefficients=data["coefficients"],
+                    window_start=data["window_start"],
+                    window_duration=data["window_duration"],
+                    side="right",
                 )
                 
                 if self.config.segment_use:
                     if (len(data["pc_left_non_ground"]) ==0 or len(data["right_non_ground_idx"]) == 0):
-                        matching_non_ground = np.empty((0,6))
-                        idx_non_ground = np.empty(0, dtype = np.int64)
+                        matching_non_ground = np.empty((0,9))
+                        idx_left_non_ground = np.empty(0, dtype=np.int64)
+                        idx_right_non_ground = np.empty(0, dtype=np.int64)
+
                     else:
-                        matching_non_ground, idx_non_ground = self.match_group(
-                            data["pc_left_non_ground"],
+                        # matching_non_ground, idx_non_ground = self.match_group(
+                        #     data["pc_left_non_ground"],
+                        #     pc_right_corrected[data["right_non_ground_idx"]],
+                        #     data["right_non_ground_idx"],
+                        #     data["pc_right"],
+                        #     voxelization_use=self.config.plant_voxelization_use,
+                        # )
+                        matching_non_ground, idx_left_non_ground, idx_right_non_ground = self.match_group(
+                            pc_left_corrected[data["left_non_ground_idx"]],
                             pc_right_corrected[data["right_non_ground_idx"]],
+                            data["left_non_ground_idx"],
                             data["right_non_ground_idx"],
+                            data["pc_left"],
                             data["pc_right"],
                             voxelization_use=self.config.plant_voxelization_use,
                         )
@@ -147,29 +189,56 @@ class FactorGraphOptimizerCubicSplineBatch:
                     if (len(data["pc_left_ground"]) == 0 or len(data["right_ground_idx"]) == 0):
                         raise ValueError("Ground points are not enough!")
                     
-                    matching_ground, idx_ground = self.match_group(
-                        data["pc_left_ground"],
+                    # matching_ground, idx_ground = self.match_group(
+                    #     data["pc_left_ground"],
+                    #     pc_right_corrected[data["right_ground_idx"]],
+                    #     data["right_ground_idx"],
+                    #     data["pc_right"],
+                    #     disable_filters=(window_current_id== min(all_windows.keys()) or window_current_id== max(all_windows.keys())),
+                    # )
+                    matching_ground, idx_left_ground, idx_right_ground = self.match_group(
+                        pc_left_corrected[data["left_ground_idx"]],
                         pc_right_corrected[data["right_ground_idx"]],
+                        data["left_ground_idx"],
                         data["right_ground_idx"],
+                        data["pc_left"],
                         data["pc_right"],
-                        disable_filters=(window_current_id== min(all_windows.keys()) or window_current_id== max(all_windows.keys())),
+                        disable_filters=(
+                            window_current_id == min(all_windows.keys())
+                            or window_current_id == max(all_windows.keys())
+                        ),
                     )
                     if len(matching_ground) == 0:
                         raise ValueError("Ground point is not enough! Try to adjust the downsample/filtering")
                     elif len(matching_non_ground) <10:
                         matching_all = matching_ground
-                        idx_all = idx_ground
-                        idx_non_ground = np.empty(0, dtype=np.int64)
+                        idx_left_all = idx_left_ground
+                        idx_right_all = idx_right_ground
+
+                        idx_left_non_ground = np.empty(0, dtype=np.int64)
+                        idx_right_non_ground = np.empty(0, dtype=np.int64)
                         print("#"*10)
                         print("Warning, plant points are not enough, bad results!")
                         print("#"*10)
                     else:
                         matching_all = np.concatenate([matching_non_ground,matching_ground], axis = 0)
-                        idx_all = np.concatenate([idx_non_ground,idx_ground])
+                        idx_left_all = np.concatenate(
+                            [idx_left_non_ground, idx_left_ground]
+                        )
+
+                        idx_right_all = np.concatenate(
+                            [idx_right_non_ground, idx_right_ground]
+                        )
                     data["matching"] = matching_all
-                    data["pcr_idx"] = idx_all
-                    data["pcr_idx_non_ground"] = idx_non_ground
-                    data["pcr_idx_ground"] = idx_ground
+
+                    data["pcl_idx"] = idx_left_all
+                    data["pcr_idx"] = idx_right_all
+
+                    data["pcl_idx_non_ground"] = idx_left_non_ground
+                    data["pcr_idx_non_ground"] = idx_right_non_ground
+
+                    data["pcl_idx_ground"] = idx_left_ground
+                    data["pcr_idx_ground"] = idx_right_ground
 
                     print(
                         f"matching window = {window_current_id+1},"
@@ -177,15 +246,19 @@ class FactorGraphOptimizerCubicSplineBatch:
                         f"ground={len(matching_ground)},"
                         f"total={len(matching_all)},")
                 else:
+                    left_idx_all = np.arange(len(data["pc_left"]))
                     right_idx_all = np.arange(len(data["pc_right"]))
-                    matching_all, idx_all = self.match_group(
-                        data["pc_left"],
+                    matching_all, idx_left_all, idx_right_all = self.match_group(
+                        pc_left_corrected,
                         pc_right_corrected,
+                        left_idx_all,
                         right_idx_all,
+                        data["pc_left"],
                         data["pc_right"],
                     )
                     data["matching"] = matching_all
-                    data["pcr_idx"] = idx_all
+                    data["pcl_idx"] = idx_left_all
+                    data["pcr_idx"] = idx_right_all
                     print(
                         f"matching window = {window_current_id+1}, "
                         f"total={len(matching_all)},"
@@ -265,11 +338,14 @@ class FactorGraphOptimizerCubicSplineBatch:
     
     
     
-    def match_group(self,pc_left, pc_right_corrected, right_idx, pc_right_original,voxelization_use=None,disable_filters=False):
-        icp = CubicIcpFactor(pc_left,pc_right_corrected)
-        matching, filtered_idx = icp.matching(self.config,voxelization_use=voxelization_use,disable_filters=disable_filters)
-        original_idx = right_idx[filtered_idx]
+    def match_group(self,pc_left_corrected, pc_right_corrected,left_idx, right_idx, pc_left_original, pc_right_original,voxelization_use=None,disable_filters=False):
+        icp = CubicIcpFactor(pc_left_corrected,pc_right_corrected)
+        matching, filtered_left_idx, filtered_right_idx = icp.matching(self.config,voxelization_use=voxelization_use,disable_filters=disable_filters)
+        original_left_idx = left_idx[filtered_left_idx]
+        original_right_idx = right_idx[filtered_right_idx]
         matching_opt = matching.copy()
-        matching_opt[:, 3:6] = pc_right_original[original_idx]
 
-        return matching_opt, original_idx     
+        matching_opt[:, 0:3] = pc_left_original[original_left_idx]
+        matching_opt[:, 3:6] = pc_right_original[original_right_idx]
+
+        return matching_opt, original_left_idx, original_right_idx  

@@ -87,31 +87,77 @@ def window_data( window_index, kin_cal, idx_left, idx_right):
         rotation_right = np.concatenate(rotation_right_list, axis=0)
         translation_right = np.vstack(translation_right_list)
 
+        
+        
+        time_left_list = []
+        rotation_left_list = []
+        translation_left_list = []
+        # --------------------------------------------------------------
+        # Expand each trajectory state to all laser points in its frame
+        # --------------------------------------------------------------
+        for frame_index, frame in enumerate(laser_left.frames):
+            num_points = frame.M
+            state = trajectory_left.statesall[frame_index]
+
+            rotation_nb = (
+                RotmatZ(state[9])
+                @ RotmatY(state[8])
+                @ RotmatX(state[7])
+            )
+            translation_nb = state[1:4]
+
+            time_left_list.append(
+                np.full(
+                    (num_points, 1),
+                    laser_left.timestamps[frame_index],
+                )
+            )
+            rotation_left_list.append(
+                np.repeat(
+                    rotation_nb[None, :, :],
+                    num_points,
+                    axis=0,
+                )
+            )
+            translation_left_list.append(
+                np.repeat(
+                    translation_nb[None, :],
+                    num_points,
+                    axis=0,
+                )
+            )
+
+        time_left = np.vstack(time_left_list)
+        rotation_left = np.concatenate(rotation_left_list, axis=0)
+        translation_left = np.vstack(translation_left_list)
+        
+        
+        
+        
+        
+        
         return (
             pc_left,
             pc_right,
             time_right,
             rotation_right,
             translation_right,
+            time_left,
+            rotation_left,
+            translation_left,
         )
 
 
 
 
 
-def get_non_ground_indices(points, config_threshould,ground_voxel,name="cloud"):
-    """Return CSF non-ground indices and downsampled ground indices."""
-
+def get_non_ground_indices(points, config_threshould,SloopSmooth,cloth_resolution,rigidness):
     points = np.asarray(points, dtype=np.float64)
-
-    # ------------------------------------------------------------------
-    # EXPERIMENT HOOK: CSF ground-segmentation parameters
-    # ------------------------------------------------------------------
     csf = CSF.CSF()
-    csf.params.bSloopSmooth = True
-    csf.params.cloth_resolution = 0.15
+    csf.params.bSloopSmooth = SloopSmooth
+    csf.params.cloth_resolution = cloth_resolution
     csf.params.class_threshold = config_threshould
-    csf.params.rigidness = 3
+    csf.params.rigidness = rigidness
     csf.setPointCloud(points)
 
     ground = CSF.VecInt()
@@ -121,24 +167,9 @@ def get_non_ground_indices(points, config_threshould,ground_voxel,name="cloud"):
     ground_idx = np.asarray(ground, dtype=np.int64)
     non_ground_idx = np.asarray(non_ground, dtype=np.int64)
 
-    # ------------------------------------------------------------------
-    # EXPERIMENT HOOK: ground-point downsampling
-    # ------------------------------------------------------------------
-    raw_ground_count = len(ground_idx)
-    if name=="right":
-        ground_idx = ground_idx
-    else:
-        ground_idx = voxel_downsample_indices(
-            points,
-            ground_idx,
-            voxel_size=ground_voxel,
-        )
-
     print(
-        f"[CSF] {name}: "
         f"total={len(points)}, "
-        f"ground_raw={raw_ground_count}, "
-        f"ground_downsampled={len(ground_idx)}, "
+        f"ground={len(ground_idx)}, "
         f"non_ground={len(non_ground_idx)}, "
         f"non_ground_ratio={100 * len(non_ground_idx) / len(points):.2f}%"
     )
@@ -146,17 +177,3 @@ def get_non_ground_indices(points, config_threshould,ground_voxel,name="cloud"):
     return non_ground_idx, ground_idx
 
 
-def voxel_downsample_indices(points, indices, voxel_size=0.05):
-    """Downsample selected points while preserving original point indices."""
-
-    selected_points = points[indices]
-    voxel_coordinates = np.floor(
-        selected_points / voxel_size
-    ).astype(np.int64)
-
-    _, unique_local_indices = np.unique(
-        voxel_coordinates,
-        axis=0,
-        return_index=True,
-    )
-    return indices[unique_local_indices]

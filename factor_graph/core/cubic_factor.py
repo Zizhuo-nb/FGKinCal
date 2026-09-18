@@ -14,20 +14,25 @@ class CubicIcpFactor:
         self.xyzm1 = None # point matches 1
         self.xyzm2 = None  # point matches 2
 
-    def matching(self, config, voxelization_use = None,disable_filters = False):
-            if voxelization_use is None:
-                voxelization_use = config.voxelization_use
-            if voxelization_use:
-                pc1_downsampled, _ = self.voxel_downsampling(self.pc1, config.voxel_size)
-            elif voxelization_use == False:
-                pc1_downsampled, _ = self.voxel_downsampling(self.pc1, config.plant_voxel)
+    def matching(self, config, point_type="ground",disable_filters = False):
+            if config.voxelization_use:
+                if point_type == "plant":
+                    voxel_size = config.plant_voxel
+                elif point_type == "ground":
+                    voxel_size = config.ground_voxel
+                else:
+                    voxel_size = (config.plant_voxel + config.ground_voxel)/2
+                pc1_downsampled, idx1_down = self.voxel_downsampling(self.pc1, voxel_size)
+            else:
+                pc1_downsampled = self.pc1
+                idx1_down = np.arange(len(self.pc1))
             nbrs = NearestNeighbors(n_neighbors=1, algorithm="auto").fit(self.pc2)
             dNN, idxNN = nbrs.kneighbors(pc1_downsampled)
     
             valid_mask = dNN[:,0] < config.max_dist
     
             self.mx1 = pc1_downsampled[valid_mask]
-
+            self.idx1 = idx1_down[valid_mask]
             self.idx2 = idxNN[valid_mask, 0]   
             self.mx2 = self.pc2[self.idx2]
             self.pc_i = np.hstack((self.mx1, self.mx2))
@@ -42,6 +47,7 @@ class CubicIcpFactor:
 
             self.mx1 = self.mx1[idx]
             self.mx2 = self.mx2[idx]
+            self.idx1 = self.idx1[idx]
             self.idx2 = self.idx2[idx]
     
             # Filter by roughness
@@ -50,6 +56,7 @@ class CubicIcpFactor:
 
                 self.mx1 = self.mx1[idx]
                 self.mx2 = self.mx2[idx]
+                self.idx1 = self.idx1[idx]
                 self.idx2 = self.idx2[idx]
                 n1 = n1[idx]
     
@@ -65,6 +72,7 @@ class CubicIcpFactor:
 
             self.mx1 = self.mx1[idx]
             self.mx2 = self.mx2[idx]
+            self.idx1 = self.idx1[idx]
             self.idx2 = self.idx2[idx]
             n1 = n1[idx]
     
@@ -74,6 +82,7 @@ class CubicIcpFactor:
 
                 self.mx1 = self.mx1[idx]
                 self.mx2 = self.mx2[idx]
+                self.idx1 = self.idx1[idx]
                 self.idx2 = self.idx2[idx]
                 n1 = n1[idx]
                 n2 = n2[idx]
@@ -90,6 +99,7 @@ class CubicIcpFactor:
 
                 self.mx1 = self.mx1[idx]
                 self.mx2 = self.mx2[idx]
+                self.idx1 = self.idx1[idx]
                 self.idx2 = self.idx2[idx]
                 n1 = n1[idx]
                 n2 = n2[idx]
@@ -98,8 +108,8 @@ class CubicIcpFactor:
             # Compute mean normal and point-to-plane distance
             idx = sp < 0
             n2[idx] = -n2[idx]
-            # n = 0.5 * (n1 + n2)
-            n = n1
+            n = 0.5 * (n1 + n2)
+            # n = n1
             dx = self.mx2 - self.mx1 
             p2p_d = np.sum(n * dx, axis=1)
            
@@ -112,6 +122,7 @@ class CubicIcpFactor:
 
                 self.mx1 = self.mx1[idx]
                 self.mx2 = self.mx2[idx]
+                self.idx1 = self.idx1[idx]
                 self.idx2 = self.idx2[idx]
                 n = n[idx]
     
@@ -121,7 +132,7 @@ class CubicIcpFactor:
             self.xyzm1 = self.mx1
             self.xyzm2 = self.mx2
 
-            return self.pc_i, self.idx2
+            return self.pc_i, self.idx1,self.idx2
     
         
         
@@ -201,121 +212,273 @@ class CubicIcpFactor:
 
 
 
+# def icp_error_func(
+#         coefficients,
+#         matching,
+#         pcr_idx,
+#         time_r,
+#         R_NB_r,
+#         t_NB_r,
+#         window_start,
+#         window_duration
+# ):
+#     """
+# coefficients: (24,)
+#     order:
+#     [rx_a0, rx_a1, rx_a2, rx_a3,
+#         ry_a0, ry_a1, ry_a2, ry_a3,
+#         rz_a0, rz_a1, rz_a2, rz_a3,
+#         tx_a0, tx_a1, tx_a2, tx_a3,
+#         ty_a0, ty_a1, ty_a2, ty_a3,
+#         tz_a0, tz_a1, tz_a2, tz_a3]
+
+# matching: (N, 9)
+#     [left_UTM, right_static_UTM, normal_UTM]
+
+# return:
+#     residual: (N,)
+#     jacobian: (N, 24)
+# """
+#     p_left = matching[:,0:3]
+#     p_right_static = matching[:,3:6]
+#     normals = matching[:,6:9]
+#     time_right = time_r[pcr_idx]
+#     R_NB_right = R_NB_r[pcr_idx]
+#     t_NB_right = t_NB_r[pcr_idx]
+
+#     #right UTM point back to body frame
+#     q_static_body = np.einsum(
+#         "nij,nj->ni",
+#         R_NB_right.transpose(0,2,1),
+#         p_right_static - t_NB_right)
+
+#     #spline base function
+#     u = (time_right-window_start)/window_duration
+
+#     basis = np.column_stack((
+#         np.ones_like(u),
+#         u,
+#         u**2,
+#         u**3
+#     )) #(N,4)
+
+#     coefficients = np.asarray(coefficients).reshape(6,4)
+
+#     #6dof kin calibration
+#     xi = basis @ coefficients.T #(N,6)
+#     rotation_vector = xi[:,0:3]
+#     translation = xi[:,3:6]
+#     #kin cal fix static point
+#     delta_R = Rotation.from_rotvec(rotation_vector).as_matrix()
+
+#     q_corrected_body = (
+#         np.einsum("nij,nj->ni", delta_R, q_static_body)
+#         + translation
+#     )
+#     #back to UTM
+#     p_right_corrected = (
+#         np.einsum("nij,nj->ni", R_NB_right, q_corrected_body)
+#         + t_NB_right
+#     )
+#     #point_to_plane error
+#     residual = np.sum(
+#         normals * (p_right_corrected - p_left),
+#         axis=1
+#     )  # (N,)
+#     # ============================================================
+#     # 9. 对瞬时6D动态外参的雅可比
+#     #
+#     # h_i =
+#     # n_i^T R_NB(t_i)
+#     # [-[q_corrected^B]_x, I]
+#     #
+#     # 首先计算：
+#     # g_i^T = n_i^T R_NB(t_i)
+#     # ============================================================
+
+#     g = np.einsum(
+#         "ni,nij->nj",
+#         normals,
+#         R_NB_right
+#     )  # (N, 3)
+
+#     # g^T(-[q]_x) = q × g
+#     jacobian_rotation = np.cross(
+#         q_corrected_body,
+#         g
+#     )  # (N, 3)
+
+#     jacobian_translation = g  # (N, 3)
+
+#     jacobian_pose = np.hstack((
+#         jacobian_rotation,
+#         jacobian_translation
+#     ))  # (N, 6)
+
+#     # ============================================================
+#     # 10. 由6维位姿雅可比扩展为24维样条系数雅可比
+#     #
+#     # J_i = h_i ⊗ b(u_i)^T
+#     #
+#     # 每个自由度对应4个样条系数
+#     # ============================================================
+
+#     jacobian = (
+#         jacobian_pose[:, :, None]
+#         * basis[:, None, :]
+#     ).reshape(-1, 24)
+
+#     return residual, jacobian
+
+
+
 def icp_error_func(
         coefficients,
         matching,
+        pcl_idx,
         pcr_idx,
+        time_l,
+        R_NB_l,
+        t_NB_l,
         time_r,
         R_NB_r,
         t_NB_r,
         window_start,
         window_duration
 ):
-    """
-coefficients: (24,)
-    order:
-    [rx_a0, rx_a1, rx_a2, rx_a3,
-        ry_a0, ry_a1, ry_a2, ry_a3,
-        rz_a0, rz_a1, rz_a2, rz_a3,
-        tx_a0, tx_a1, tx_a2, tx_a3,
-        ty_a0, ty_a1, ty_a2, ty_a3,
-        tz_a0, tz_a1, tz_a2, tz_a3]
+    p_left_static = matching[:, 0:3]
+    p_right_static = matching[:, 3:6]
+    normals = matching[:, 6:9]
 
-matching: (N, 9)
-    [left_UTM, right_static_UTM, normal_UTM]
+    time_left = np.asarray(time_l).reshape(-1)[pcl_idx]
+    time_right = np.asarray(time_r).reshape(-1)[pcr_idx]
 
-return:
-    residual: (N,)
-    jacobian: (N, 24)
-"""
-    p_left = matching[:,0:3]
-    p_right_static = matching[:,3:6]
-    normals = matching[:,6:9]
-    time_right = time_r[pcr_idx]
+    R_NB_left = R_NB_l[pcl_idx]
+    t_NB_left = t_NB_l[pcl_idx]
+
     R_NB_right = R_NB_r[pcr_idx]
     t_NB_right = t_NB_r[pcr_idx]
 
-    #right UTM point back to body frame
-    q_static_body = np.einsum(
+    q_left_static = np.einsum(
         "nij,nj->ni",
-        R_NB_right.transpose(0,2,1),
-        p_right_static - t_NB_right)
-
-    #spline base function
-    u = (time_right-window_start)/window_duration
-
-    basis = np.column_stack((
-        np.ones_like(u),
-        u,
-        u**2,
-        u**3
-    )) #(N,4)
-
-    coefficients = np.asarray(coefficients).reshape(6,4)
-
-    #6dof kin calibration
-    xi = basis @ coefficients.T #(N,6)
-    rotation_vector = xi[:,0:3]
-    translation = xi[:,3:6]
-    #kin cal fix static point
-    delta_R = Rotation.from_rotvec(rotation_vector).as_matrix()
-
-    q_corrected_body = (
-        np.einsum("nij,nj->ni", delta_R, q_static_body)
-        + translation
+        R_NB_left.transpose(0, 2, 1),
+        p_left_static - t_NB_left
     )
-    #back to UTM
+
+    q_right_static = np.einsum(
+        "nij,nj->ni",
+        R_NB_right.transpose(0, 2, 1),
+        p_right_static - t_NB_right
+    )
+
+    u_left = (time_left - window_start) / window_duration
+    u_right = (time_right - window_start) / window_duration
+
+    basis_left = np.column_stack((
+        np.ones_like(u_left),
+        u_left,
+        u_left**2,
+        u_left**3
+    ))
+
+    basis_right = np.column_stack((
+        np.ones_like(u_right),
+        u_right,
+        u_right**2,
+        u_right**3
+    ))
+
+    coefficients = np.asarray(coefficients).reshape(6, 4)
+
+    xi_left = basis_left @ coefficients.T
+    xi_right = basis_right @ coefficients.T
+
+    R_left = Rotation.from_rotvec(
+        xi_left[:, 0:3]
+    ).as_matrix()
+
+    R_right = Rotation.from_rotvec(
+        xi_right[:, 0:3]
+    ).as_matrix()
+
+    q_left_rotated = np.einsum(
+        "nij,nj->ni",
+        R_left.transpose(0, 2, 1),
+        q_left_static
+    )
+
+    q_right_rotated = np.einsum(
+        "nij,nj->ni",
+        R_right,
+        q_right_static
+    )
+
+    q_left_corrected = (
+        q_left_rotated
+        - 0.5 * xi_left[:, 3:6]
+    )
+
+    q_right_corrected = (
+        q_right_rotated
+        + 0.5 * xi_right[:, 3:6]
+    )
+
+    p_left_corrected = (
+        np.einsum(
+            "nij,nj->ni",
+            R_NB_left,
+            q_left_corrected
+        )
+        + t_NB_left
+    )
+
     p_right_corrected = (
-        np.einsum("nij,nj->ni", R_NB_right, q_corrected_body)
+        np.einsum(
+            "nij,nj->ni",
+            R_NB_right,
+            q_right_corrected
+        )
         + t_NB_right
     )
-    #point_to_plane error
-    residual = np.sum(
-        normals * (p_right_corrected - p_left),
-        axis=1
-    )  # (N,)
-    # ============================================================
-    # 9. 对瞬时6D动态外参的雅可比
-    #
-    # h_i =
-    # n_i^T R_NB(t_i)
-    # [-[q_corrected^B]_x, I]
-    #
-    # 首先计算：
-    # g_i^T = n_i^T R_NB(t_i)
-    # ============================================================
 
-    g = np.einsum(
+    residual = np.sum(
+        normals * (p_right_corrected - p_left_corrected),
+        axis=1
+    )
+
+    g_left = np.einsum(
+        "ni,nij->nj",
+        normals,
+        R_NB_left
+    )
+
+    g_right = np.einsum(
         "ni,nij->nj",
         normals,
         R_NB_right
-    )  # (N, 3)
+    )
 
-    # g^T(-[q]_x) = q × g
-    jacobian_rotation = np.cross(
-        q_corrected_body,
-        g
-    )  # (N, 3)
+    jacobian_pose_left = np.hstack((
+        np.cross(q_left_rotated, g_left),
+        0.5 * g_left
+    ))
 
-    jacobian_translation = g  # (N, 3)
+    jacobian_pose_right = np.hstack((
+        np.cross(q_right_rotated, g_right),
+        0.5 * g_right
+    ))
 
-    jacobian_pose = np.hstack((
-        jacobian_rotation,
-        jacobian_translation
-    ))  # (N, 6)
-
-    # ============================================================
-    # 10. 由6维位姿雅可比扩展为24维样条系数雅可比
-    #
-    # J_i = h_i ⊗ b(u_i)^T
-    #
-    # 每个自由度对应4个样条系数
-    # ============================================================
-
-    jacobian = (
-        jacobian_pose[:, :, None]
-        * basis[:, None, :]
+    jacobian_left = (
+        jacobian_pose_left[:, :, None]
+        * basis_left[:, None, :]
     ).reshape(-1, 24)
+
+    jacobian_right = (
+        jacobian_pose_right[:, :, None]
+        * basis_right[:, None, :]
+    ).reshape(-1, 24)
+
+    jacobian = jacobian_left + jacobian_right
 
     return residual, jacobian
 

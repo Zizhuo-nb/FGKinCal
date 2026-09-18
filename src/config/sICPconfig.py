@@ -11,7 +11,8 @@ class sICPconfig:
     step_size: float
     max_iterations: int
     voxelization_use: bool
-    voxel_size: float
+    plant_voxel: float
+    ground_voxel: float
     max_dist: float
     normals_radius = float
     normals_minpoints = int
@@ -21,9 +22,11 @@ class sICPconfig:
     normal_angle_max = float
     mad_use = bool
     segment_use = bool
-    csf_shreshould = float
-    ground_voxel = float
-    plant_voxelization_use = bool
+    SloopSmooth = bool
+    cloth_resolution = float
+    CSFThreshould = float
+    rigidness = int
+    continuity = bool
     boundary_control = bool
     txyz: np.ndarray
 
@@ -37,7 +40,8 @@ class sICPconfig:
         self.max_iterations = 50
         self.convergence_threshold = 0.001
         self.voxelization_use = True
-        self.voxel_size = 0.06
+        self.plant_voxel = 0.01
+        self.ground_voxel = 0.03
         self.max_dist = 0.06
         self.normals_radius = 0.01
         self.normals_minpoints = 10
@@ -48,11 +52,12 @@ class sICPconfig:
         self.normal_angle_max = 40
         self.mad_use = True
         self.segment_use = True
-        self.csf_shreshould = 0.05
-        self.ground_voxel = 0.007
-        self.plant_voxelization_use = True
-        self.plant_voxel = 0.01
-        self.boundary_control = False
+        self.CSFThreshould = 0.05
+        self.SloopSmooth = True
+        self.cloth_resolution = 0.015
+        self.rigidness = 3
+        self.continuity = True
+        self.boundary_control = True
 
         # Georeferencing Config
         self.txyz = np.array([0, 0, 0])
@@ -73,7 +78,8 @@ class sICPconfig:
         self.max_iterations = config["ICPConfig"].get("maxiterations")  
         self.convergence_threshold = config["ICPConfig"].get("convergence_threshold")
         self.voxelization_use = config["ICPConfig"]["Voxelization"].get("use")
-        self.voxel_size = config["ICPConfig"]["Voxelization"].get("voxelsize")
+        self.plant_voxel = config["ICPConfig"]["Voxelization"].get("plant_voxelsize")
+        self.ground_voxel = config["ICPConfig"]["Voxelization"].get("ground_voxelsize")
         self.max_dist = config["ICPConfig"]["Matching"].get("maxdist")
         self.normals_radius = config["ICPConfig"]["Normals"].get("radius")
         self.normals_minpoints = config["ICPConfig"]["Normals"].get("minpoints")
@@ -85,13 +91,13 @@ class sICPconfig:
         self.mad_use = config["ICPConfig"]["Rejection"]["MAD"].get("use")
         
         #SplineConfig
-        self.csf_shreshould = config["SplineOptmizerConfig"].get("CSFThreshould")
+        self.CSFThreshould = config["SplineOptmizerConfig"]["Segmentation"].get("CSFThreshould")
         self.segment_use = config["SplineOptmizerConfig"]["Segmentation"].get("use")
-        self.ground_voxel = config["SplineOptmizerConfig"]["Segmentation"].get("ground_voxel")
-        self.plant_voxelization_use = config["SplineOptmizerConfig"]["Segmentation"].get("plant_voxel_use")
+        self.SloopSmooth = config["SplineOptmizerConfig"]["Segmentation"].get("SloopSmooth")
         self.boundary_control = config["SplineOptmizerConfig"].get("boundary_control")
-        self.plant_voxel = config["SplineOptmizerConfig"]["Segmentation"].get("plant_voxel_if_false")
-        
+        self.continuity = config["SplineOptmizerConfig"].get("continuity")        
+        self.cloth_resolution = config["SplineOptmizerConfig"]["Segmentation"].get("cloth_resolution")
+        self.rigidness = config["SplineOptmizerConfig"]["Segmentation"].get("rigidness")
         
         self.txyz = np.array( [config["GeorefConfig"]["globaloffset"].get("x"),
                                config["GeorefConfig"]["globaloffset"].get("y"),
@@ -111,7 +117,8 @@ class sICPconfig:
                 "convergence_threshold": self.convergence_threshold,
                 "Voxelization": {
                     "use": self.voxelization_use,
-                    "voxelsize": self.voxel_size
+                    "plant_voxelsize": self.plant_voxel,
+                    "ground_voxelsize": self.ground_voxel
                 },
                 "Matching": {
                     "maxdist": self.max_dist
@@ -143,15 +150,15 @@ class sICPconfig:
                 }
             },
             "SplineOptmizerConfig":{
-                "CSFThreshould": self.csf_shreshould,
 
-                "Segmentation":{
+                "Segmentation": {
                     "use": self.segment_use,
-                    "plant_voxel_use": self.plant_voxelization_use,
-                    "plant_voxel_if_false": self.plant_voxel,
-                    "ground_voxel": self.ground_voxel,
+                    "SloopSmooth": self.SloopSmooth,
+                    "cloth_resolution": self.cloth_resolution,
+                    "CSFThreshould": self.CSFThreshould,
+                    "rigidness": self.rigidness
                 },
-                
+                "continuity": self.continuity,
                 "boundary_control": self.boundary_control
             }
             
@@ -181,7 +188,8 @@ class sICPconfig:
         table2.add_column("Value       ", style="magenta")
         table2.add_row("Maximum Iterations", str(self.max_iterations))
         table2.add_row("Voxelization Use", str(self.voxelization_use))
-        table2.add_row("Voxel Size", str(self.voxel_size))
+        table2.add_row("Plant Voxel Size", str(self.plant_voxel))
+        table2.add_row("Ground Voxel Size", str(self.ground_voxel))
         table2.add_row("Max Distance", str(self.max_dist))
         table2.add_row("Normals Radius", str(self.normals_radius))
         table2.add_row("Normals min points", str(self.normals_minpoints))
@@ -202,11 +210,12 @@ class sICPconfig:
         table4 = Table()
         table4.add_column("SplineOptimizer Prameter", style="cyan")
         table4.add_column("Value       ", style="magenta")
-        table4.add_row("CSF Threshould", str(self.csf_shreshould))
         table4.add_row("segmentaion use", str(self.segment_use))
-        table4.add_row("ground voxel", str(self.ground_voxel))
-        table4.add_row("plant_voxel_use", str(self.plant_voxelization_use))
-        table4.add_row("plant_voxel_if_false", str(self.plant_voxel))        
+        table4.add_row("SloopSmooth", str(self.SloopSmooth))
+        table4.add_row("cloth_resolution", str(self.cloth_resolution))
+        table4.add_row("CSF Threshould", str(self.CSFThreshould))
+        table4.add_row("rigidness", str(self.rigidness))
+        table4.add_row("continuity", str(self.continuity))
         table4.add_row("boundary_control", str(self.boundary_control))
    
         

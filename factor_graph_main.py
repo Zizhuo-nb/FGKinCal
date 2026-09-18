@@ -1,4 +1,4 @@
-from factor_graph.src.FactorGraphOptimizationCubicSplineBatch import FactorGraphOptimizerCubicSplineBatch
+from factor_graph.src.FGSkinscancal import FGSkinscancal
 import time
 import click
 
@@ -18,7 +18,7 @@ def main(parent_dir,
          date):
     start_time = time.time()
 
-    factorgraph = FactorGraphOptimizerCubicSplineBatch(parent_dir,
+    factorgraph = FGSkinscancal(parent_dir,
                               output_dir,
                               calibration_dir,
                               configfile,

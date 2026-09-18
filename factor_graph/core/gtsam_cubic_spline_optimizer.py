@@ -8,6 +8,7 @@ from factor_graph.core.cubic_factor import icp_error_func,c0_error_func,c1_error
 def gtsam_optimize_single_cubic_icp(
     windows,
     boundary_control,
+    continuity,
     icp_sigma=0.01,
     c0_sigma=0.001,
     c1_sigma=0.002,
@@ -38,7 +39,11 @@ def gtsam_optimize_single_cubic_icp(
         residual, _ = icp_error_func(
             coefficients_current,
             data["matching"],
+            data["pcl_idx"],
             data["pcr_idx"],
+            data["time_left"],
+            data["rotation_left"],
+            data["translation_left"],
             data["time_right"],
             data["rotation_right"],
             data["translation_right"],
@@ -83,7 +88,11 @@ def gtsam_optimize_single_cubic_icp(
                 residual, jacobian = icp_error_func(
                     coefficients,
                     data_i["matching"],
+                    data_i["pcl_idx"],
                     data_i["pcr_idx"],
+                    data_i["time_left"],
+                    data_i["rotation_left"],
+                    data_i["translation_left"],
                     data_i["time_right"],
                     data_i["rotation_right"],
                     data_i["translation_right"],
@@ -105,6 +114,7 @@ def gtsam_optimize_single_cubic_icp(
             # icp_sigma,
             # icp_sigma * np.sqrt(matching.shape[0])
             icp_sigma_est * np.sqrt(matching.shape[0])
+         
         )
 
         graph.add(
@@ -127,58 +137,6 @@ def gtsam_optimize_single_cubic_icp(
         6,
         c2_sigma,
      )
-
-    # if boundary_control:
-    #     # # ============================
-    #     # # boundary constraints
-    #     # # ============================
-
-    #     first_id = window_ids[0]
-    #     last_id = window_ids[-1]
-
-    #     first_key = keys[first_id]
-    #     last_key = keys[last_id]
-
-    #     first_duration = windows[first_id]["window_duration"]
-    #     last_duration = windows[last_id]["window_duration"]
-
-    #     # 起点：C1 = 0
-    #     graph.add(
-    #         gtsam.CustomFactor(
-    #             c1_noise,
-    #             [first_key],
-    #             boundary_c1_error_func(mean_coefficients, first_duration, is_start=True),
-    #         )
-    #     )
-
-    #     # 起点：C2 = 0
-    #     graph.add(
-    #         gtsam.CustomFactor(
-    #             c2_noise,
-    #             [first_key],
-    #             boundary_c2_error_func(mean_coefficients,first_duration, is_start=True),
-    #         )
-    #     )
-
-    #     # 终点：C1 = 0
-    #     graph.add(
-    #         gtsam.CustomFactor(
-    #             c1_noise,
-    #             [last_key],
-    #             boundary_c1_error_func(mean_coefficients,last_duration, is_start=False),
-    #         )
-    #     )
-
-    #     # 终点：C2 = 0
-    #     graph.add(
-    #         gtsam.CustomFactor(
-    #             c2_noise,
-    #             [last_key],
-    #             boundary_c2_error_func(mean_coefficients,last_duration, is_start=False),
-    #         )
-    #     )
-        
-    #     # #===========================
     
     
     if boundary_control:
@@ -217,7 +175,7 @@ def gtsam_optimize_single_cubic_icp(
             )
         )
 
-        # Last window: pose at u = 1.
+       # Last window: pose at u = 1.
         graph.add(
             gtsam.CustomFactor(
                 boundary_noise,
@@ -228,46 +186,47 @@ def gtsam_optimize_single_cubic_icp(
                 ),
             )
         )
+    if continuity:
+        print("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")
+        for i in range(len(window_ids) - 1):
+            left_id = window_ids[i]
+            right_id = window_ids[i + 1]
 
-    for i in range(len(window_ids) - 1):
-        left_id = window_ids[i]
-        right_id = window_ids[i + 1]
+            left_key = keys[left_id]
+            right_key = keys[right_id]
 
-        left_key = keys[left_id]
-        right_key = keys[right_id]
+            duration_left = windows[left_id]["window_duration"]
+            duration_right = windows[right_id]["window_duration"]
 
-        duration_left = windows[left_id]["window_duration"]
-        duration_right = windows[right_id]["window_duration"]
-
-        graph.add(
-            gtsam.CustomFactor(
-                c0_noise,
-                [left_key, right_key],
-                c0_error_func(),
+            graph.add(
+                gtsam.CustomFactor(
+                    c0_noise,
+                    [left_key, right_key],
+                    c0_error_func(),
+                )
             )
-        )
 
-        graph.add(
-            gtsam.CustomFactor(
-                c1_noise,
-                [left_key, right_key],
-                c1_error_func(
-                    duration_left,
-                    duration_right,
-                ),
+            graph.add(
+                gtsam.CustomFactor(
+                    c1_noise,
+                    [left_key, right_key],
+                    c1_error_func(
+                        duration_left,
+                        duration_right,
+                    ),
+                )
             )
-        )
 
-        graph.add(
-            gtsam.CustomFactor(
-                c2_noise,
-                [left_key, right_key],
-                c2_error_func(
-                    duration_left,
-                    duration_right,
-                ),
+            graph.add(
+                gtsam.CustomFactor(
+                    c2_noise,
+                    [left_key, right_key],
+                    c2_error_func(
+                        duration_left,
+                        duration_right,
+                    ),
+                )
             )
-        )
 
   
    
@@ -294,7 +253,11 @@ def gtsam_optimize_single_cubic_icp(
         residual_opt, _ = icp_error_func(
             coefficients_opt,
             data["matching"],
+            data["pcl_idx"],
             data["pcr_idx"],
+            data["time_left"],
+            data["rotation_left"],
+            data["translation_left"],
             data["time_right"],
             data["rotation_right"],
             data["translation_right"],

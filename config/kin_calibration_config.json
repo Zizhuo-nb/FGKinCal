@@ -1,14 +1,15 @@
 {
     "IntervalConfig": {
-        "windowsize": 0.7,
-        "stepsize": 0.7
+        "windowsize": 0.70,
+        "stepsize": 0.70
     },
     "ICPConfig": {
         "maxiterations": 50,
         "convergence_threshold": 1e-5,
         "Voxelization": {
             "use": true,
-            "voxelsize": 0.03
+            "plant_voxelsize": 0.02,
+            "ground_voxelsize": 0.1
         },
         "Matching": {
             "maxdist": 0.06
@@ -41,15 +42,15 @@
     },
 
     "SplineOptmizerConfig":{
-        "CSFThreshould": 0.05,
 
         "Segmentation":{
             "use": true,
-            "plant_voxel_use":false,
-            "plant_voxel_if_false": 0.015,
-            "ground_voxel": 0.008
+            "SloopSmooth": true,
+            "cloth_resolution": 0.015,
+            "CSFThreshould": 0.05,
+            "rigidness": 3
         },
-
+        "continuity": true,
         "boundary_control": true
     }
 }
